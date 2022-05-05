@@ -1,0 +1,20 @@
+{
+  "name": "my-http-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "01.静态服务.js",
+  "bin": {
+    "mhs": "./bin/www"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^8.1.0",
+    "ejs": "^3.1.6",
+    "mime": "^2.5.2"
+  }
+}

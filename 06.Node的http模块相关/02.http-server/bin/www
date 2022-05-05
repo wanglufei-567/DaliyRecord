@@ -1,0 +1,28 @@
+#! /usr/bin/env node
+
+const { program } = require('commander');
+const config = require('../config');
+const version = require('../package.json').version;
+const Server = require('../src/main.js')
+
+program.version(version).name('mhs').usage('[options]');
+
+const usages = [];
+Object.values(config).forEach((value) => {
+  usages.push(value.usage);
+  // 指令注册
+  program.option(value.option, value.description, value.default);
+});
+
+// --help指令注册
+program.on('--help',function () {
+  console.log('\nExamples:')
+  usages.forEach(usage=> console.log('  ' + usage))
+})
+
+program.parse(process.argv);
+let ops = program.opts();
+console.log(ops)
+
+let server = new Server(ops);
+server.start(); // 开启服务
