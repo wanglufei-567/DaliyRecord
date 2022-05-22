@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=<device-width>, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <button id="login">点击登陆</button>
+</body>
+<script>
+  /**
+   * 创建单例的方法
+   */
+  const getSingle = function(fn){
+    let result
+    return function(...args) {
+      return result || (result = fn(...args))
+    }
+  }
+  /**
+   * 具体的单例逻辑
+   * 这里的单例指的是创建的div元素，只创建一次后面都是复用
+   */
+  const createLoginLayer = function(){
+    console.log(Date.now())
+    const div = document.createElement('div');
+    div.innerHTML = '登陆对话框';
+    div.style.display = 'none';
+    document.body.appendChild(div);
+    return div;
+  }
+  const createSingleLoginLayer = getSingle(createLoginLayer);
+
+  document.querySelector('#login').onclick = function() {
+    createSingleLoginLayer().style.display = 'block'
+  }
+</script>
+</html>
