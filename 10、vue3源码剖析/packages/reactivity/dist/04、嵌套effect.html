@@ -1,0 +1,49 @@
+<!--  -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <!-- <script src="../../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script> -->
+  <script src="./reactivity.global.js"></script>
+  <div id="app"></div>
+  <script>
+    const { effect, reactive } = VueReactivity;
+
+    const obj = { name: '张三', age: 13, address: { num: 30 }, flag: false }
+    const state = reactive(obj);
+
+    /**
+     * 虽然在effect依赖收集的实现中处理了嵌套effect收集attr的情况，
+     * 保证了name、age、address.num和e1绑定
+     * flag和e2绑定
+     * 但当e1在响应式变化之后再次执行时，依然会执行e2，相当于新创建了一个e3（effect）
+     * 这就有问题了，当flag改变时，就会产生trigger多个effect的情况，
+     * 使用vue的reactivity模块也会出现这样的问题，
+     * 所以，讲道理嵌套effect使用应该是不合理的
+     */
+
+    effect(() => { // e1
+      app.innerHTML = state.name + '今年' + state.age + '岁了门牌号是 ' + state.address.num
+      effect(() => { // e2
+        console.log('second', state.flag)
+        const p = document.createElement("p");
+        p.innerHTML = '希望有钱'
+        state.flag && app.appendChild(p)
+      })
+    })
+
+    setTimeout(() => {
+      state.age++
+      state.flag = true
+    }, 1000)
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <script src="../../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script>
+  <!-- <script src="./reactivity.global.js"></script> -->
+  <div id="app"></div>
+  <script>
+    const { effect, reactive, ref, toRef, proxyRefs } = VueReactivity;
+
+    const state = reactive({ name: '张三', age: 30 })
+    let nameRef = toRef(state, 'name')
+
+    let ageRef = proxyRefs({ age: toRef(state, 'age') })
+
+
+    effect(() => {
+      console.log('runner')
+      document.body.innerHTML = nameRef.value + '今年' + ageRef.age + '岁了'
+    })
+
+    setTimeout(() => {
+      nameRef.value = '李四'
+      ageRef.age = 31;
+    }, 1000)
+
+  </script>
+</body>
+
+</html>

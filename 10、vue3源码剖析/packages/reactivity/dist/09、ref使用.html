@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <!-- <script src="../../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script> -->
+  <script src="./reactivity.global.js"></script>
+  <div id="app"></div>
+  <script>
+    const { effect, reactive, computed, watch, ref } = VueReactivity;
+
+    const state = reactive({ age: 13 })
+
+    // 基本类型，不具备响应式能力, 用ref将基本类型变成对象类型，具备响应式能力
+    let flag = ref(false);
+    let obj = ref({ name: '张三' })
+
+    effect(() => {
+      console.log('runner')
+      // 取value属性的时候可以收集effect
+      app.innerHTML = flag.value + obj.value.name
+    })
+
+    setTimeout(() => {
+      // 改value的时候可以触发effect重新执行
+      flag.value = true;
+      obj.value.name = '李四'
+    }, 1000)
+
+  </script>
+</body>
+
+</html>

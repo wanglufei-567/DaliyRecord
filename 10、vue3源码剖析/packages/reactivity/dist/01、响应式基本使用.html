@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <script src="../../../node_modules/@vue/reactivity/dist/reactivity.global.js"></script>
+  <!-- <script src="./reactivity.global.js"></script> -->
+  <div id="app"></div>
+  <script>
+    const { effect, reactive } = VueReactivity;
+
+    const obj = { name: 'zf', age: 13, address: { num: 30 }, flag: true }
+
+    // reactive() 会对属性进行劫持 proxy， 监听用户的获取操作和设置操作
+    // reactive() 只能传入对象， 因为proxy 只支持对象格式
+    const state = reactive(obj);
+
+    // effect 函数默认会执行一次， 后续数据变化了会重新执行effect函数
+    effect(() => {
+      app.body.innerHTML = state.name + '今年' + state.age + '岁了门牌号是 ' + state.address.num
+    })
+
+    setTimeout(() => {
+      state.age++
+    }, 1000)
+  </script>
+</body>
+
+</html>
