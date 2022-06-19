@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <div id="app"></div>
+
+  <script>
+    const { h, createVNode, render } = VueRuntimeDOM
+
+    /**
+     * 新子节点是文本
+     * 数组 ——> 文本
+     * 文本 ——> 文本
+     * 空 ——> 文本
+     * 若旧子节点是数组，则需先删除旧子节点，再设置文本内容
+     * 不是的话，直接设置文本内容
+     */
+    const oldArrChild = createVNode('h1', {}, ['hello', 'world'])
+    const newTextChild = h('h1', { style: { color: 'red' } }, 'Vue3.0')
+    console.log('vnode1', oldArrChild)
+    console.log('vnode2', newTextChild)
+
+    render(oldArrChild, app)
+
+    setTimeout(() => {
+      render(newTextChild, app)
+    }, 5000)
+  </script>
+</body>
+
+</html>

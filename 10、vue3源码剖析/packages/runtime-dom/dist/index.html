@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <div id="app"></div>
+
+  <script>
+    const { h, createVNode, render } = VueRuntimeDOM
+
+    /**
+     * 新子节点是文本
+     * 数组 ——> 文本
+     * 文本 ——> 文本
+     * 空 ——> 文本
+     */
+    const oldArrChild = createVNode('p', {}, 'hello world')
+    const newTextChild = h('h1', { style: { color: 'red' } }, [oldArrChild, 'Vue3.0'])
+
+    render(newTextChild, app)
+
+    setTimeout(() => {
+      const vnode3 = h('h1', { style: { color: 'green' } }, [oldArrChild, 'This is Vue3.0'])
+      render(vnode3, app)
+    }, 2000)
+
+    setTimeout(() => {
+      render(null, app)
+    }, 4000)
+  </script>
+</body>
+
+</html>

@@ -33,6 +33,14 @@ importers:
     dependencies:
       '@vue/shared': link:../shared
 
+  packages/runtime-dom:
+    specifiers:
+      '@vue/runtime-core': workspace:^1.0.0
+      '@vue/shared': workspace:^1.0.0
+    dependencies:
+      '@vue/runtime-core': link:../runtime-core
+      '@vue/shared': link:../shared
+
 packages:
 
   registry.npmmirror.com/@babel/helper-validator-identifier/7.16.7:
