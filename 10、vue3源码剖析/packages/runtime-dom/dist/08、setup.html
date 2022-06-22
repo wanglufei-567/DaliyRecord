@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div id="app"></div>
+  <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.prod.js"></script>
+  <!-- <script src="./runtime-dom.global.js"></script> -->
+  <script>
+    const { render, Text, h, Fragment, getCurrentInstance, reactive, toRefs } = VueRuntimeDOM;
+
+    function useCount() {
+      const state = reactive({ count: 0 });
+      const handleClick = () => {
+        state.count++
+      }
+      return {
+        state,
+        handleClick
+      }
+    }
+
+    const MyComponent = {
+      props: {
+        count: {}
+      },
+
+      setup(props, { attrs, emit }) {
+        return () => h(Fragment, [
+          h('div', null, props.count),
+          h('button', {
+            onClick: () => {
+              emit('childUpdate', 1, 2, 3);
+            }
+          }, '子组件增加')
+        ])
+      }
+    }
+
+    const VueComponent = {
+      setup() {
+        const { state, handleClick } = useCount()
+        return {
+          ...toRefs(state),
+          handleClick
+        }
+
+      },
+      render() {
+        return h('div', [
+          h('button', {
+            onClick: () => this.handleClick()
+          }, '父组件增加'),
+          h(MyComponent, {
+            count: this.count, onChildUpdate: (...args) => {
+              this.handleClick()
+            }
+          })])
+      }
+    }
+
+
+    render(h(VueComponent), app);
+  </script>
+</body>
+
+</html>

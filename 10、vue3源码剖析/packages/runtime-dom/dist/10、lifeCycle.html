@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, Text, h, Fragment, getCurrentInstance, reactive, toRefs, onMounted } = VueRuntimeDOM;
+
+    const VueComponent = {
+      setup() {
+
+        onMounted(() => {
+          console.log(getCurrentInstance())
+          console.log('m1')
+        })
+        onMounted(() => {
+
+          console.log('m2')
+        })
+        onMounted(() => {
+          console.log('m3')
+
+        })
+      },
+      render() {
+        return h('div', 'hello')
+      }
+    }
+    render(h(VueComponent), app);
+
+  </script>
+</body>
+
+</html>

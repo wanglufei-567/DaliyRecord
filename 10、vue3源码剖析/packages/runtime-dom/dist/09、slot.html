@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.prod.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, Text, h, Fragment, getCurrentInstance, reactive, toRefs } = VueRuntimeDOM;
+
+
+    const MyComponent = {
+      setup(props, { attrs, emit, slots, expose }) {
+        return function () {
+          return h(Fragment, [
+            h('div', this.$slots.default()),
+            h('div', slots.header()),
+            h('div', slots.main()),
+            h('div', slots.footer())
+          ])
+        }
+      }
+    }
+
+    const VueComponent = {
+      render() {
+        return h('div', h(MyComponent, null, { // 类型是一个对象
+          default: () => {
+            return h('a', 'default')
+          },
+          header: () => {
+            return h('a', 'hello')
+          },
+          main: () => {
+            return h('a', 'world')
+          },
+          footer: () => {
+            return h('a', 'Vue3.X')
+          }
+        }))
+      }
+    }
+    render(h(VueComponent), app);
+  </script>
+</body>
+
+</html>

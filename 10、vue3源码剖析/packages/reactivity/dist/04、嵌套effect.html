@@ -26,23 +26,65 @@
      * 但当e1在响应式变化之后再次执行时，依然会执行e2，相当于新创建了一个e3（effect）
      * 这就有问题了，当flag改变时，就会产生trigger多个effect的情况，
      * 使用vue的reactivity模块也会出现这样的问题，
-     * 所以，讲道理嵌套effect使用应该是不合理的
+     * 所以，讲道理这样使用嵌套effect是不合理的
+     *
+
+     *
      */
 
-    effect(() => { // e1
+    const runner = effect(() => { // e1
       app.innerHTML = state.name + '今年' + state.age + '岁了门牌号是 ' + state.address.num
       effect(() => { // e2
-        console.log('second', state.flag)
+        console.log('second')
+        return null
         const p = document.createElement("p");
         p.innerHTML = '希望有钱'
         state.flag && app.appendChild(p)
       })
     })
 
+    runner.effect.stop();
+
     setTimeout(() => {
       state.age++
-      state.flag = true
     }, 1000)
+
+    setTimeout(() => {
+      state.flag = true
+    }, 2000)
+
+    /**
+     * 组件的实现中，每个组件都是创建了一个effect，
+     * 但是嵌套组件中就不会出现上面的问题，这是为什么？
+     * 这是因为组件创建effect是在初始化时创建的，
+     * 后续不管时data变化还是props变化，父组件的effect重新触发时
+     * 重新渲染子组件的时候会去判断子组件是否挂载过，
+     * 那挂载过的子组件自然不会走到新建effect的逻辑
+     * 那自然不会存在上面这种问题
+     *
+     * 类似于下面这种实现，标识组件已经挂载过了，就不再创建effect
+     */
+    let mounted = false;
+    effect(() => { // e1
+      app.innerHTML = state.name + '今年' + state.age + '岁了门牌号是 ' + state.address.num
+      if (!mounted) {
+        effect(() => { // e2
+          console.log('second')
+          const p = document.createElement("p");
+          p.innerHTML = '希望有钱'
+          state.flag && app.appendChild(p)
+          mounted = true
+        })
+      }
+    })
+
+    setTimeout(() => {
+      state.age++
+    }, 1000)
+
+    setTimeout(() => {
+      state.flag = true
+    }, 2000)
   </script>
 </body>
 

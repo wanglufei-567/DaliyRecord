@@ -16,8 +16,9 @@ export function h(type, propsOrChildren, children) {
   const l = arguments.length;
   if (l === 2) {
     // 参数为两个的情况 1） 元素 + 属性 2） 元素 + children
+
     if (isObject(propsOrChildren) && !isArray(propsOrChildren)) {
-      // 若propsOrChildren是对象的话 则其可能是属性也有可能是children VNode
+      // 若propsOrChildren是对象的话 则其可能是 属性 也有可能是 children VNode
       if (isVnode(propsOrChildren)) {
         // children VNode 将其用数组包起来 h(type,元素对象)
         return createVNode(type, null, [propsOrChildren]);

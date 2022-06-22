@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div id="app"></div>
+  <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script> -->
+  <script src="./runtime-dom.global.js"></script>
+  <script>
+    const { render, Text, h, Fragment, getCurrentInstance, reactive, provide, inject } = VueRuntimeDOM;
+
+    /**
+     * 原型链
+     * 组件的渲染流程 父 instance.provides = {state:state} -》 子 instance.provides = instance.parent.provides  -》 孙子 instance.provides = instance.parent.provides
+     * parent 构建组件的父子关系， 渲染的时候 我们是按照 父 -》 子  -》 孙子的方式来渲染
+     */
+
+    const ChildComponent = { // instance
+      setup() {
+        const state = inject('state', { name: '默认值', age: 13 });
+        return () => {
+          console.log('ChildComponent')
+          return h(Text, state.name + state.age)
+        }
+      }
+    }
+
+    const VueComponent = {
+      setup() {
+        const state = reactive({ name: '张三', age: 13 });
+
+        provide('state', state)
+
+        setTimeout(() => {
+          state.name = '李四'
+        }, 6000)
+        return () => {
+          console.log('VueComponent')
+          return h(ChildComponent)
+        }
+      }
+    }
+
+    render(h(VueComponent), app)
+
+  </script>
+</body>
+
+</html>

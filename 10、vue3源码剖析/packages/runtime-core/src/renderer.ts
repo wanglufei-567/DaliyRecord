@@ -6,7 +6,9 @@ import {
   Fragment
 } from './createVNode';
 import { ReactiveEffect } from 'packages/reactivity/src/effect';
+import { invokerFns } from '@vue/shared';
 import { createComponentInstance, setupComponent } from './component';
+import { queueJob } from './scheduler';
 
 /**
  * 获取最长递增子序列的方法
@@ -80,7 +82,6 @@ export function createRenderer(options) {
     patchProp: hostPatchProp, // 对节点属性的操作
     createElement: hostCreateElement, // 创建元素
     createTextNode: hostCreateTextNode, // 创建文本
-    createText: hostCreateText,
     querySelector: hostQuerySelector,
     insert: hostInsert,
     remove: hostRemove,
@@ -517,6 +518,15 @@ export function createRenderer(options) {
         // 组件初始化挂载
 
         /**
+         * lifeCycle hook BEFORE_MOUNT
+         * 生命周期钩子，挂载前
+         */
+        if (instance.bm) {
+          // ...
+          invokerFns(instance.bm);
+        }
+
+        /**
          * 调用用户写的原始组件中的render
          * 并将其生成的VNode挂到组件实例instance.subTree上
          * 组件最终要渲染的虚拟节点 就是subtree
@@ -537,10 +547,19 @@ export function createRenderer(options) {
          * 注意：这里patch的是subTree不是instance
          * subTree的VNode的类型有用户编写的render决定
          */
-        patch(null, subTree, container, anchor);
+        patch(null, subTree, container, anchor, instance);
 
         instance.subTree = subTree;
         instance.isMounted = true; // 标识当前组件已经挂载过了
+
+        /**
+         * lifeCycle kook MOUNTED
+         * 生命周期钩子，挂载完成
+         */
+        if (instance.m) {
+          // ...
+          invokerFns(instance.m);
+        }
       } else {
         // 组件更新
 
@@ -563,13 +582,25 @@ export function createRenderer(options) {
          * 更新逻辑
          * 将新的VNode和旧的VNode传给patch方法进行更新
          */
-        patch(instance.subTree, subTree, container, anchor);
+        patch(instance.subTree, subTree, container, anchor, instance);
+
         // 更新subTree
         instance.subTree = subTree;
+
+        /**
+         * lifeCycle hook UPDATED
+         * 生命周期钩子，更新完成
+         */
+        if (instance.u) {
+          // ....
+          invokerFns(instance.u);
+        }
       }
     };
 
-    const effect = new ReactiveEffect(componentUpdate);
+    const effect = new ReactiveEffect(componentUpdate, () =>
+      queueJob(instance.update)
+    );
 
     /**
      * 将effect的run方法绑定到组件上，
@@ -589,18 +620,29 @@ export function createRenderer(options) {
    * @param anchor 锚点 用于真实节点的insert操作
    * 组件的更新流程 插槽的更新 属性更新
    */
-  function mountComponent(vnode, container, anchor) {
+  function mountComponent(vnode, container, anchor, parentComponent) {
     /**
      * （1）组件挂载前 需要创建一个组件的实例（对象）
      * 对象中包含了组件的状态、组件的属性、组件对应的生命周期
      * 将创建的组件实例保存到vnode上
      */
     const instance = (vnode.component =
-      createComponentInstance(vnode));
+      createComponentInstance(vnode, parentComponent));
 
     /**
-     * (2) 处理组件的插槽和组件的属性
-     * 给组件的实例上的属性进行赋值
+     * (2) 处理组件的属性和组件的插槽
+     * 处理属性：
+     *  初始化props：
+     *    用户接收的props挂到instance.props上
+     *    用户未接收的props挂到instance.attrs上
+     *    将instance.props处理成响应式的
+     *  设置代理对象instance.proxy供用户访问:
+     *    对组件实例对象进行代理，data、props、$attrs...等的get和set
+     *  处理setup:
+     *    给setup的两个参数props和context进行赋值，并进行传参调用
+     *    根据setup的执行结果改变组件的render或setupState
+     *  初始化slots：
+     *    将slots挂到组件实例上instance.slots
      */
     setupComponent(instance);
 
@@ -682,17 +724,8 @@ export function createRenderer(options) {
    * fragment类型的VNode的挂载和更新处理
    */
   function processFragment(n1, n2, container, parentComponent) {
-    const fragmentEndAnchor = (n2.anchor = n1
-      ? n1.anchor
-      : hostCreateText(''));
-
     if (n1 == null) {
-      mountChildren(
-        n2.children,
-        container,
-        fragmentEndAnchor,
-        parentComponent
-      );
+      mountChildren(n2.children, container, null, parentComponent);
     } else {
       patchKeyedChildren(
         n1.children,
@@ -723,10 +756,10 @@ export function createRenderer(options) {
   /**
    * 组件类型的VNode的挂载和更新处理
    */
-  function processComponent(n1, n2, container, anchor) {
+  function processComponent(n1, n2, container, anchor, parentComponent) {
     if (n1 == null) {
       // 初始化挂载组件
-      mountComponent(n2, container, anchor);
+      mountComponent(n2, container, anchor, parentComponent);
     } else {
       // 组件的更新流程 插槽的更新 属性更新
       updateComponent(n1, n2);
@@ -770,7 +803,7 @@ export function createRenderer(options) {
           // 通过位运算判断当前VNode是元素类型
           processElement(n1, n2, container, anchor, parentComponent);
         } else if (shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
-          processComponent(n1, n2, container, anchor);
+          processComponent(n1, n2, container, anchor, parentComponent);
         }
     }
   };
@@ -803,7 +836,6 @@ export function createRenderer(options) {
    * @param container 容器，真实的DOM节点
    */
   function render(vnode, container) {
-    debugger;
     if (vnode == null) {
       // 卸载
       if (container._vnode) {

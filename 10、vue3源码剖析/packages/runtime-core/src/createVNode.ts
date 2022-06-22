@@ -75,14 +75,17 @@ export function createVNode(type, props = null, children = null) {
   /**
    * 通过位运算
    * 将当前的VNode 和 children VNode映射起来
-   * 通过shapeFlags 就可以知道children VNode的类型了 是数组 还是元素 还是文本
+   * 通过shapeFlags 就可以知道children VNode的类型了 是数组 还是元素 还是文本、插槽
    * 利用的是位运算在权限控制中的应用
    */
-  if (children) {
+  if (children !== undefined && children !== null) {
     let temp = 0;
     // 子节点的数据格式，暂时只考虑数组和字符串
     if (isArray(children)) {
       temp = ShapeFlags.ARRAY_CHILDREN;
+    } else if (isObject(children)) {
+      // children是对象的话，暂时直接判断为插槽（还有可能为其他类型）
+      temp = ShapeFlags.SLOTS_CHILDREN;
     } else {
       children = String(children);
       temp = ShapeFlags.TEXT_CHILDREN;

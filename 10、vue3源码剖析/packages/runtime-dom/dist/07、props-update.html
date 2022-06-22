@@ -33,22 +33,26 @@
         }, 1000)
       },
       render() {
-        return h('a', this.a);
+        console.log('ChildComponent')
+        return h('p', this.a);
       }
     }
 
     const VueComponent = {
       data() {
-        return { flag: true } // 数据源
+        return { flag: true, name: '张三' } // 数据源
       },
       render() { // render函数返回虚拟节点 决定最终渲染的结果
+        console.log('VueComponent')
         return h(Fragment, [
-          h(ChildComponent, { a: this.flag ? 1 : 2, b: 100 }),
+          h('p', this.name),
           h('button', {
             onClick: () => {
-              this.flag = false;
+              this.name = '李四';
+              setTimeout(() => {this.flag = false}, 1000)
             }
-          }, '重新渲染组件')
+          }, '修改'),
+          h(ChildComponent, { a: this.flag ? 1 : 2, b: 100 })
         ])
       }
     }

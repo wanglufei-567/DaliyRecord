@@ -35,16 +35,24 @@ var VueRuntimeDOM = (() => {
   var src_exports = {};
   __export(src_exports, {
     Fragment: () => Fragment,
+    LifeCycle: () => LifeCycle,
     Text: () => Text,
     computed: () => computed,
     createRenderer: () => createRenderer,
     createVNode: () => createVNode,
     effect: () => effect,
+    getCurrentInstance: () => getCurrentInstance,
     h: () => h,
+    inject: () => inject,
+    onBeforeMount: () => onBeforeMount,
+    onMounted: () => onMounted,
+    onUpdated: () => onUpdated,
+    provide: () => provide,
     proxyRefs: () => proxyRefs,
     reactive: () => reactive,
     ref: () => ref,
     render: () => render,
+    setCurrentInstance: () => setCurrentInstance,
     shallowRef: () => shallowRef,
     toReactive: () => toReactive,
     toRef: () => toRef,
@@ -68,6 +76,11 @@ var VueRuntimeDOM = (() => {
   };
   var hasOwnProperty = Object.prototype.hasOwnProperty;
   var hasOwn = (obj, key) => hasOwnProperty.call(obj, key);
+  function invokerFns(fns) {
+    for (let i = 0; i < fns.length; i++) {
+      fns[i]();
+    }
+  }
 
   // packages/reactivity/src/effect.ts
   var activeEffect = void 0;
@@ -385,10 +398,12 @@ var VueRuntimeDOM = (() => {
       el: null,
       shapeFlag
     };
-    if (children) {
+    if (children !== void 0 && children !== null) {
       let temp = 0;
       if (isArray(children)) {
         temp = 16 /* ARRAY_CHILDREN */;
+      } else if (isObject(children)) {
+        temp = 32 /* SLOTS_CHILDREN */;
       } else {
         children = String(children);
         temp = 8 /* TEXT_CHILDREN */;
@@ -421,8 +436,11 @@ var VueRuntimeDOM = (() => {
   }
 
   // packages/runtime-core/src/component.ts
-  function createComponentInstance(vnode) {
-    let instance = {
+  var instance = null;
+  var getCurrentInstance = () => instance;
+  var setCurrentInstance = (i) => instance = i;
+  function createComponentInstance(vnode, parent) {
+    let instance2 = {
       data: null,
       vnode,
       subTree: null,
@@ -432,34 +450,19 @@ var VueRuntimeDOM = (() => {
       propsOptions: vnode.type.props || {},
       props: {},
       attrs: {},
-      proxy: null
+      proxy: null,
+      setupState: {},
+      parent,
+      provides: parent ? parent.provides : /* @__PURE__ */ Object.create(null)
     };
-    return instance;
+    return instance2;
   }
-  function initProps(instance, rawProps) {
-    const props = {};
-    const attrs = {};
-    const options = instance.propsOptions;
-    if (rawProps) {
-      for (let key in rawProps) {
-        const value = rawProps[key];
-        if (key in options) {
-          props[key] = value;
-        } else {
-          attrs[key] = value;
-        }
-      }
-    }
-    instance.props = reactive(props);
-    instance.attrs = attrs;
-  }
-  var publicProperties = {
-    $attrs: (instance) => instance.attrs
-  };
   var instanceProxy = {
     get(target, key) {
-      const { data, props } = target;
-      if (data && hasOwn(data, key)) {
+      const { data, props, setupState } = target;
+      if (setupState && hasOwn(setupState, key)) {
+        return setupState[key];
+      } else if (data && hasOwn(data, key)) {
         return data[key];
       } else if (props && hasOwn(props, key)) {
         return props[key];
@@ -470,8 +473,10 @@ var VueRuntimeDOM = (() => {
       }
     },
     set(target, key, value) {
-      const { data, props } = target;
-      if (data && hasOwn(data, key)) {
+      const { data, props, setupState } = target;
+      if (setupState && hasOwn(setupState, key)) {
+        setupState[key] = value;
+      } else if (data && hasOwn(data, key)) {
         data[key] = value;
       } else if (props && hasOwn(props, key)) {
         console.warn("props not update");
@@ -480,18 +485,95 @@ var VueRuntimeDOM = (() => {
       return true;
     }
   };
-  function setupComponent(instance) {
-    let { type, props } = instance.vnode;
-    let { data, render: render2 } = type;
-    initProps(instance, props);
-    instance.proxy = new Proxy(instance, instanceProxy);
+  var publicProperties = {
+    $attrs: (instance2) => instance2.attrs,
+    $slots: (instance2) => instance2.slots
+  };
+  function initProps(instance2, rawProps) {
+    const props = {};
+    const attrs = {};
+    const options = instance2.propsOptions;
+    if (rawProps) {
+      for (let key in rawProps) {
+        const value = rawProps[key];
+        if (key in options) {
+          props[key] = value;
+        } else {
+          attrs[key] = value;
+        }
+      }
+    }
+    instance2.props = reactive(props);
+    instance2.attrs = attrs;
+  }
+  function initSlots(instance2, children) {
+    if (instance2.vnode.shapeFlag & 32 /* SLOTS_CHILDREN */) {
+      instance2.slots = children;
+    }
+  }
+  function setupComponent(instance2) {
+    let { type, props, children } = instance2.vnode;
+    let { data, render: render2, setup } = type;
+    initProps(instance2, props);
+    initSlots(instance2, children);
+    instance2.proxy = new Proxy(instance2, instanceProxy);
     if (data) {
       if (!isFunction(data)) {
         return console.warn("The data option must be a function.");
       }
-      instance.data = reactive(data.call({}));
+      instance2.data = reactive(data.call({}));
     }
-    instance.render = render2;
+    if (setup) {
+      const context = {
+        emit: (eventName, ...args) => {
+          const name = `on${eventName[0].toUpperCase()}${eventName.slice(1)}`;
+          let invoker = instance2.vnode.props[name];
+          invoker && invoker(...args);
+        },
+        slots: instance2.slots,
+        attrs: instance2.attrs,
+        expose: (exposed) => {
+          instance2.exposed = exposed || {};
+        }
+      };
+      setCurrentInstance(instance2);
+      const setupResult = setup(instance2.props, context);
+      setCurrentInstance(null);
+      if (isFunction(setupResult)) {
+        instance2.render = setupResult;
+      } else if (isObject(setupResult)) {
+        instance2.setupState = proxyRefs(setupResult);
+      }
+    }
+    if (!instance2.render) {
+      if (render2) {
+        instance2.render = render2;
+      } else {
+      }
+    }
+  }
+
+  // packages/runtime-core/src/scheduler.ts
+  var queue = [];
+  var isFlushing = false;
+  var resolvePromise = Promise.resolve();
+  function queueJob(job) {
+    if (!queue.includes(job)) {
+      queue.push(job);
+    }
+    if (!isFlushing) {
+      isFlushing = true;
+      resolvePromise.then(() => {
+        isFlushing = false;
+        let copyQueue = queue.slice(0);
+        queue.length = 0;
+        for (let i = 0; i < copyQueue.length; i++) {
+          let job2 = copyQueue[i];
+          job2();
+        }
+        copyQueue.length = 0;
+      });
+    }
   }
 
   // packages/runtime-core/src/renderer.ts
@@ -541,7 +623,6 @@ var VueRuntimeDOM = (() => {
       patchProp: hostPatchProp,
       createElement: hostCreateElement,
       createTextNode: hostCreateTextNode,
-      createText: hostCreateText,
       querySelector: hostQuerySelector,
       insert: hostInsert,
       remove: hostRemove,
@@ -701,47 +782,56 @@ var VueRuntimeDOM = (() => {
       patchProps(oldProps, newProps, el);
       patchChildren(n1, n2, el, null, parentComponent);
     }
-    function updateProps(instance, prevProps, nextProps) {
+    function updateProps(instance2, prevProps, nextProps) {
       for (let key in nextProps) {
-        instance.props[key] = nextProps[key];
+        instance2.props[key] = nextProps[key];
       }
       for (let key in prevProps) {
         if (!(key in nextProps)) {
-          delete instance.props[key];
+          delete instance2.props[key];
         }
       }
     }
-    function updateComponentPreRender(instance, next) {
-      instance.next = null;
-      instance.vnode = next;
-      updateProps(instance, instance.props, next.props);
+    function updateComponentPreRender(instance2, next) {
+      instance2.next = null;
+      instance2.vnode = next;
+      updateProps(instance2, instance2.props, next.props);
     }
-    function setupRenderEffect(instance, container, anchor) {
+    function setupRenderEffect(instance2, container, anchor) {
       const componentUpdate = () => {
-        const { render: render3 } = instance;
-        if (!instance.isMounted) {
-          const subTree = render3.call(instance.proxy);
-          patch(null, subTree, container, anchor);
-          instance.subTree = subTree;
-          instance.isMounted = true;
-        } else {
-          let next = instance.next;
-          if (next) {
-            updateComponentPreRender(instance, next);
+        const { render: render3 } = instance2;
+        if (!instance2.isMounted) {
+          if (instance2.bm) {
+            invokerFns(instance2.bm);
           }
-          const subTree = render3.call(instance.proxy);
-          patch(instance.subTree, subTree, container, anchor);
-          instance.subTree = subTree;
+          const subTree = render3.call(instance2.proxy);
+          patch(null, subTree, container, anchor, instance2);
+          instance2.subTree = subTree;
+          instance2.isMounted = true;
+          if (instance2.m) {
+            invokerFns(instance2.m);
+          }
+        } else {
+          let next = instance2.next;
+          if (next) {
+            updateComponentPreRender(instance2, next);
+          }
+          const subTree = render3.call(instance2.proxy);
+          patch(instance2.subTree, subTree, container, anchor, instance2);
+          instance2.subTree = subTree;
+          if (instance2.u) {
+            invokerFns(instance2.u);
+          }
         }
       };
-      const effect2 = new ReactiveEffect(componentUpdate);
-      let update = instance.update = effect2.run.bind(effect2);
+      const effect2 = new ReactiveEffect(componentUpdate, () => queueJob(instance2.update));
+      let update = instance2.update = effect2.run.bind(effect2);
       update();
     }
-    function mountComponent(vnode, container, anchor) {
-      const instance = vnode.component = createComponentInstance(vnode);
-      setupComponent(instance);
-      setupRenderEffect(instance, container, anchor);
+    function mountComponent(vnode, container, anchor, parentComponent) {
+      const instance2 = vnode.component = createComponentInstance(vnode, parentComponent);
+      setupComponent(instance2);
+      setupRenderEffect(instance2, container, anchor);
     }
     function hasChange(prevProps, nextProps) {
       for (let key in nextProps) {
@@ -757,12 +847,12 @@ var VueRuntimeDOM = (() => {
       return hasChange(prevProps, nextProps);
     }
     function updateComponent(n1, n2) {
-      const instance = n2.component = n1.component;
+      const instance2 = n2.component = n1.component;
       if (shouldComponentUpdate(n1, n2)) {
-        instance.next = n2;
-        instance.update();
+        instance2.next = n2;
+        instance2.update();
       } else {
-        instance.vnode = n2;
+        instance2.vnode = n2;
       }
     }
     function processText(n1, n2, container) {
@@ -777,9 +867,8 @@ var VueRuntimeDOM = (() => {
       }
     }
     function processFragment(n1, n2, container, parentComponent) {
-      const fragmentEndAnchor = n2.anchor = n1 ? n1.anchor : hostCreateText("");
       if (n1 == null) {
-        mountChildren(n2.children, container, fragmentEndAnchor, parentComponent);
+        mountChildren(n2.children, container, null, parentComponent);
       } else {
         patchKeyedChildren(n1.children, n2.children, container, parentComponent);
       }
@@ -791,9 +880,9 @@ var VueRuntimeDOM = (() => {
         patchElement(n1, n2, parentComponent);
       }
     }
-    function processComponent(n1, n2, container, anchor) {
+    function processComponent(n1, n2, container, anchor, parentComponent) {
       if (n1 == null) {
-        mountComponent(n2, container, anchor);
+        mountComponent(n2, container, anchor, parentComponent);
       } else {
         updateComponent(n1, n2);
       }
@@ -815,7 +904,7 @@ var VueRuntimeDOM = (() => {
           if (shapeFlag & 1 /* ELEMENT */) {
             processElement(n1, n2, container, anchor, parentComponent);
           } else if (shapeFlag & 4 /* STATEFUL_COMPONENT */) {
-            processComponent(n1, n2, container, anchor);
+            processComponent(n1, n2, container, anchor, parentComponent);
           }
       }
     };
@@ -832,7 +921,6 @@ var VueRuntimeDOM = (() => {
       hostRemove(n1.el);
     };
     function render2(vnode, container) {
-      debugger;
       if (vnode == null) {
         if (container._vnode) {
           unmount(container._vnode, null);
@@ -845,6 +933,53 @@ var VueRuntimeDOM = (() => {
     return {
       render: render2
     };
+  }
+
+  // packages/runtime-core/src/apiLifeCycle.ts
+  var LifeCycle = /* @__PURE__ */ ((LifeCycle2) => {
+    LifeCycle2["BEFORE_MOUNT"] = "bm";
+    LifeCycle2["MOUNTED"] = "m";
+    LifeCycle2["UPDATED"] = "u";
+    return LifeCycle2;
+  })(LifeCycle || {});
+  function createInvoker(type) {
+    return function(hook, currentInstance = instance) {
+      if (currentInstance) {
+        const lifeCycles = currentInstance[type] || (currentInstance[type] = []);
+        const wrapHook = () => {
+          setCurrentInstance(currentInstance);
+          hook.call(currentInstance);
+          setCurrentInstance(null);
+        };
+        lifeCycles.push(wrapHook);
+      }
+    };
+  }
+  var onBeforeMount = createInvoker("bm" /* BEFORE_MOUNT */);
+  var onMounted = createInvoker("m" /* MOUNTED */);
+  var onUpdated = createInvoker("u" /* UPDATED */);
+
+  // packages/runtime-core/src/apiInject.ts
+  function provide(key, value) {
+    if (!instance)
+      return;
+    let parentProvides = instance.parent && instance.parent.provides;
+    let currentProvides = instance.provides;
+    if (currentProvides === parentProvides) {
+      currentProvides = instance.provides = Object.create(parentProvides);
+    }
+    currentProvides[key] = value;
+  }
+  function inject(key, defaultValue) {
+    var _a;
+    if (!instance)
+      return;
+    const provides = (_a = instance.parent) == null ? void 0 : _a.provides;
+    if (provides && key in provides) {
+      return provides[key];
+    } else {
+      return defaultValue;
+    }
   }
 
   // packages/runtime-dom/src/nodeOps.ts
@@ -900,7 +1035,7 @@ var VueRuntimeDOM = (() => {
   }
 
   // packages/runtime-dom/src/patch-prop/patchEvent.ts
-  function createInvoker(initialValue) {
+  function createInvoker2(initialValue) {
     const invoker = (e) => {
       invoker.value(e);
     };
@@ -915,7 +1050,7 @@ var VueRuntimeDOM = (() => {
     } else {
       const eName = eventName.slice(2).toLowerCase();
       if (nextValue) {
-        const invoker = createInvoker(nextValue);
+        const invoker = createInvoker2(nextValue);
         invokers[eventName] = invoker;
         el.addEventListener(eName, invoker);
       } else if (exitingInvoker) {
