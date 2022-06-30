@@ -12,7 +12,7 @@ import { isVnode, createVNode } from './createVNode';
  * 5) 元素 空属性 多个儿子
  * 注意子节点是：数组、文本、null
  */
-export function h(type, propsOrChildren, children) {
+export function h(type, propsOrChildren?, children?) {
   const l = arguments.length;
   if (l === 2) {
     // 参数为两个的情况 1） 元素 + 属性 2） 元素 + children

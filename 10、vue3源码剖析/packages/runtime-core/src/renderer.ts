@@ -9,6 +9,7 @@ import { ReactiveEffect } from 'packages/reactivity/src/effect';
 import { invokerFns } from '@vue/shared';
 import { createComponentInstance, setupComponent } from './component';
 import { queueJob } from './scheduler';
+import { isKeepAlive } from './keepAlive';
 
 /**
  * 获取最长递增子序列的方法
@@ -498,7 +499,10 @@ export function createRenderer(options) {
   function updateComponentPreRender(instance, next) {
     instance.next = null;
     instance.vnode = next; // 更新虚拟节点和next属性
-    updateProps(instance, instance.props, next.props); // 之前的props
+    // 更新props
+    updateProps(instance, instance.props, next.props);
+    // 更新插槽
+    Object.assign(instance.slots, next.children);
   }
 
   /**
@@ -545,7 +549,8 @@ export function createRenderer(options) {
          * 和元素类型、文本类型一样
          * 传入VNode给patch方法进行渲染
          * 注意：这里patch的是subTree不是instance
-         * subTree的VNode的类型有用户编写的render决定
+         * subTree的VNode的类型由用户编写的render决定
+         * 注意：这里指定当前组件实例instance为subTree的父组件parentComponent
          */
         patch(null, subTree, container, anchor, instance);
 
@@ -626,8 +631,19 @@ export function createRenderer(options) {
      * 对象中包含了组件的状态、组件的属性、组件对应的生命周期
      * 将创建的组件实例保存到vnode上
      */
-    const instance = (vnode.component =
-      createComponentInstance(vnode, parentComponent));
+    const instance = (vnode.component = createComponentInstance(
+      vnode,
+      parentComponent
+    ));
+
+    /**
+     * 若是KeepAlive组件则
+     * 给组件实例上的上下文属性
+     * 挂上DOM操作方法
+     */
+    if (isKeepAlive(vnode)) {
+      instance.ctx.renderer = internals;
+    }
 
     /**
      * (2) 处理组件的属性和组件的插槽
@@ -668,12 +684,23 @@ export function createRenderer(options) {
   /**
    * 判断组件是否需要更新的方法
    * (1) 根据props判断
+   * (2) 根据slot判断
    */
   function shouldComponentUpdate(n1, n2) {
     const prevProps = n1.props;
     const nextProps = n2.props;
 
-    return hasChange(prevProps, nextProps); // 如果属性有变化说明要更新
+    if (hasChange(prevProps, nextProps)) {
+      // 如果属性有变化说明要更新
+      return true;
+    }
+
+    if (n1.children || n2.children) {
+      // 如果有插槽就要更新
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -756,10 +783,25 @@ export function createRenderer(options) {
   /**
    * 组件类型的VNode的挂载和更新处理
    */
-  function processComponent(n1, n2, container, anchor, parentComponent) {
+  function processComponent(
+    n1,
+    n2,
+    container,
+    anchor,
+    parentComponent
+  ) {
     if (n1 == null) {
-      // 初始化挂载组件
-      mountComponent(n2, container, anchor, parentComponent);
+      if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
+        /**
+         * 判断是否是keepAlive 要激活的组件
+         * 若是，则走keepAlive组件的激活逻辑（从缓存中取出真实节点直接挂载）
+         * 不走初始化挂载逻辑，
+         */
+        parentComponent.ctx.active(n2, container, anchor);
+      } else {
+        // 初始化挂载组件
+        mountComponent(n2, container, anchor, parentComponent);
+      }
     } else {
       // 组件的更新流程 插槽的更新 属性更新
       updateComponent(n1, n2);
@@ -803,7 +845,13 @@ export function createRenderer(options) {
           // 通过位运算判断当前VNode是元素类型
           processElement(n1, n2, container, anchor, parentComponent);
         } else if (shapeFlag & ShapeFlags.STATEFUL_COMPONENT) {
-          processComponent(n1, n2, container, anchor, parentComponent);
+          processComponent(
+            n1,
+            n2,
+            container,
+            anchor,
+            parentComponent
+          );
         }
     }
   };
@@ -814,6 +862,11 @@ export function createRenderer(options) {
   const unmount = (n1, parentComponent) => {
     let { shapeFlag, component } = n1;
 
+    /**
+     * 判断要卸载的是否是keepAlive 要缓存的组件
+     * 若是则走keepAlive的失活逻辑（将组件对应的真实节点缓存起来）
+     * 并不真的卸载
+     */
     if (shapeFlag & ShapeFlags.COMPONENT_SHOULD_KEEP_ALIVE) {
       parentComponent.ctx.deactivate(n1);
     }
@@ -822,11 +875,35 @@ export function createRenderer(options) {
       // fragment 删除所有子节点
       return unmountChildren(n1.children, parentComponent);
     } else if (shapeFlag & ShapeFlags.COMPONENT) {
-      // _vnode 组件的虚拟节点  subTree组件渲染的内容
       return unmount(component.subTree, parentComponent); // 组件要卸载的是subTree 而不是自己
     }
 
     hostRemove(n1.el);
+  };
+
+  /**
+   * VNode对应的真实节点的移动方法
+   * @param vnode 虚拟节点
+   * @param container 父容器（真实节点）
+   * @param anchor 锚点
+   */
+  const move = (vnode, container, anchor) => {
+    const { el, shapeFlag } = vnode;
+    if (shapeFlag & ShapeFlags.COMPONENT) {
+      move(vnode.component!.subTree, container, anchor);
+      return;
+    }
+    hostInsert(el, container, anchor);
+  };
+
+  /**
+   * 一些DOM和组件的挂载、卸载、移动等方法
+   * 目前是在KeepAlive组件有用到
+   */
+  const internals = {
+    um: unmount,
+    m: move,
+    o: options
   };
 
   /**

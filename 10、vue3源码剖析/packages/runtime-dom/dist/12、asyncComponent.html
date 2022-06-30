@@ -2,61 +2,50 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
 </head>
 
 <body>
-    <div id="app"></div>
-    <!-- <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script> -->
-    <script src="./runtime-dom.global.js"></script>
-    <script>
-        const { render, Text, h, Fragment, getCurrentInstance, reactive, toRefs, onMounted, provide, inject, defineAsyncComponent } = VueRuntimeDOM;
-        /*
-        let asyncComponent = defineAsyncComponent(async () => {
-            // import()
-            await new Promise((resolve,reject)=>{
-                setTimeout(() => {
-                    resolve()
-                },1000);
-            })
-            // es7语法
-            return import('./test.js').then((data)=>data.default)
-        })
-        render(h(asyncComponent), app)
-        */
+  <div id="app"></div>
+  <script src="../../../node_modules/@vue/runtime-dom/dist/runtime-dom.global.js"></script>
+  <!-- <script src="./runtime-dom.global.js"></script> -->
+  <script>
+    const { render, h, defineAsyncComponent } = VueRuntimeDOM;
 
-        let asyncComponent = defineAsyncComponent({
-            loader:async ()=>{
-                await new Promise((resolve,reject)=>{
-                    setTimeout(() => {
-                        resolve()
-                    },500);
-                })
-                // es7语法
-                return import('./test1.js').then((data)=>data.default)
-            },
-            timeout:2000,
-            // delay:1000,
-            loadingComponent:{
-                render:()=>{
-                    return h('div','loading中～～～')
-                }
-            },
-            onError(err,retry, fail) {
-                console.log('失败重新加载～～～')
-                retry();
-            },
-            errorComponent:{
-                render:()=>{
-                    return h('div','出错拉～～～')
-                }
-            }
+    let asyncComponent = defineAsyncComponent({
+      loader: async () => {
+        await new Promise((resolve, reject) => {
+          setTimeout(() => {
+            resolve()
+          }, 5000);
         })
-        render(h(asyncComponent), app)
-    </script>
+        return import('./test.js').then((data) => {
+          console.log('first', data)
+          return data.default
+        })
+      },
+      timeout: 5000,
+      loadingComponent: {
+        render: () => {
+          return h('div', 'loading中～～～')
+        }
+      },
+      onError(err, retry, fail) {
+        // retry();
+        fail()
+      },
+      errorComponent: {
+        render: () => {
+          return h('div', '出错拉～～～')
+        }
+      }
+    })
+
+    render(h(asyncComponent), app)
+  </script>
 </body>
 
 </html>

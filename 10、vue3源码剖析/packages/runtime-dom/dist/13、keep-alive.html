@@ -13,50 +13,72 @@
     <script>
         const { KeepAlive,render, Text, h, Fragment, getCurrentInstance, reactive, toRefs, onMounted, provide, inject, defineAsyncComponent } = VueRuntimeDOM;
 
+        const ComponentA = {
+            n:"a",
+            render:()=>{
+                console.log('rendera')
+                return h('a','aa')
+            }
+        }
+        const ComponentB = {
+            n:"b",
+            render:()=>{
+                console.log('renderb')
+                return h('a','bb')
+            }
+        }
+        const ComponentC = {
+            n:"c",
+            render:()=>{
+                console.log('renderc')
+                return h('a','cc')
+            }
+        }
         // 如何缓存的？  vnode， 为了性能考虑 。 我们弄一个盒子将渲染的结果临时的移动到内存中，如果后续切换回来，再从内存中直接拿出来就好了
         const Component1 = {
             n:1,
             render:()=>{
                 console.log('render1')
-                return h('a','a1')
+                return h(ComponentA)
             }
         }
         const Component2 = {
             n:2,
             render:()=>{
                 console.log('render2')
-                return h('a','a2')
+                return h(ComponentB)
             }
         }
         const Component3 = {
             n:3,
             render:()=>{
                 console.log('render3')
-                return h('a','a3')
+                return h(ComponentC)
             }
         }
-        render(h(KeepAlive,{max:2},{
-            default:()=>h(Component1)
+        render(h(KeepAlive,{max:3, order:1},{
+            default:()=>h(ComponentA)
         }),app);
 
         setTimeout(()=>{
-            render(h(KeepAlive,{max:3},{
-                default:()=>h(Component2)
+            render(h(KeepAlive,{max:3, order:2},{
+                default:()=>h(ComponentB)
             }),app);
-        },1000)
+        },5000)
 
         setTimeout(()=>{
-            render(h(KeepAlive,{max:3},{
-                default:()=>h(Component2)
+          console.log('order3')
+            render(h(KeepAlive,{max:3, order:3},{
+                default:()=>h(ComponentA)
             }),app);
-        },2000)
+        },10000)
 
         // setTimeout(()=>{
         //     render(h(KeepAlive,{max:3},{
         //         default:()=>h(Component1)
         //     }),app);
         // },3000)
-       
+
         // setTimeout(()=>{
         //     render(h(KeepAlive,null,{
         //         default:()=>h(Component2)
