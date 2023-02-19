@@ -86,7 +86,7 @@ function updateHostComponent(current, workInProgress) {
 }
 
 /**
- * @description 挂载函数组件
+ * @description 挂未确定的组件
  * @param {*} current 老fiber
  * @param {*} workInProgress 新的fiber
  * @param {*} Component workInProgress.type 组件类型，也就是函数组件的定义
