@@ -1,7 +1,8 @@
 import { REACT_ELEMENT_TYPE } from 'shared/ReactSymbols';
 import {
   createFiberFromElement,
-  createFiberFromText
+  createFiberFromText,
+  createWorkInProgress
 } from './ReactFiber';
 import { Placement } from './ReactFiberFlags';
 import isArray from 'shared/isArray';
@@ -11,20 +12,54 @@ import isArray from 'shared/isArray';
  * @param shouldTrackSideEffects 是否跟踪副作用
  */
 function createChildReconciler(shouldTrackSideEffects) {
-  shouldTrackSideEffects = true
+
+  /**
+   * @description 复用fiber
+   * @param fiber 老的fiber节点
+   * @param pendingProps 新虚拟DOM的props
+   */
+  function useFiber(fiber, pendingProps) {
+    const clone = createWorkInProgress(fiber, pendingProps);
+    clone.index = 0;
+    clone.sibling = null;
+    return clone;
+  }
+
   /**
    * @description 根据虚拟DOM创建fiber（只有单个元素的情况下）
    * @param {*} returnFiber 新的父Fiber
-   * @param {*} currentFirstFiber 老的父fiber第一个子fiber
+   * @param {*} currentFirstChild 老的父fiber第一个子fiber
    * @param {*} newChild 新的子虚拟DOM
    */
   function reconcileSingleElement(
     returnFiber,
-    currentFirstFiber,
+    currentFirstChild,
     element
   ) {
+    const key = element.key;
+    let child = currentFirstChild;
+
     /*
-      初次挂载时，老fiber节点currentFirstFiber肯定是没有的
+      若更新时新的子虚拟DOM只有一个节点，且老的父fiber存在子fiber
+      则需要从第一个子fiber开始，遍历老的父fiber的所有的子fiber
+      判断是否有老的子fiber可以直接复用
+    */
+    while (child !== null) {
+      //判断此老fiber对应的key和新的虚拟DOM对象的key是否一样 null===null
+      if (child.key === key) {
+        //判断老fiber对应的类型和新虚拟DOM元素对应的类型是否相同
+        if (child.type === element.type) {
+          //如果key一样，类型也一样，则认为此节点可以复用
+          const existing = useFiber(child, element.props);
+          existing.return = returnFiber;
+          return existing;
+        }
+      }
+      child = child.sibling;
+    }
+
+    /*
+      初次挂载时，老fiber节点currentFirstChild肯定是没有的
       所以可以直接根据虚拟DOM创建新的Fiber节点
     */
     const created = createFiberFromElement(element);
@@ -38,7 +73,7 @@ function createChildReconciler(shouldTrackSideEffects) {
    */
   function placeSingleChild(newFiber) {
     //说明要添加副作用
-    if (shouldTrackSideEffects) {
+    if (shouldTrackSideEffects && newFiber.alternate === null) {
       /*
         要在最后的提交阶段插入此节点
         React渲染分成渲染(创建Fiber树)和提交(更新真实DOM)二个阶段

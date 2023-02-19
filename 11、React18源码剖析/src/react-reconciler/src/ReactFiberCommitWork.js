@@ -1,9 +1,15 @@
 import {
   appendChild,
-  insertBefore
+  insertBefore,
+  commitUpdate
 } from 'react-dom-bindings/src/client/ReactDOMHostConfig';
-import { Placement, MutationMask } from './ReactFiberFlags';
-import { FunctionComponent, HostComponent, HostRoot, HostText } from './ReactWorkTags';
+import { Placement, MutationMask, Update } from './ReactFiberFlags';
+import {
+  FunctionComponent,
+  HostComponent,
+  HostRoot,
+  HostText
+} from './ReactWorkTags';
 
 /**
  * @description 把子节点对应的真实DOM插入到父节点DOM中
@@ -138,7 +144,7 @@ function recursivelyTraverseMutationEffects(root, parentFiber) {
  * @description 完成真实DOM的添加
  * @description 删除副作用
  */
- function commitReconciliationEffects(finishedWork) {
+function commitReconciliationEffects(finishedWork) {
   const { flags } = finishedWork;
   //如果此fiber要执行插入操作的话
   if (flags & Placement) {
@@ -155,15 +161,49 @@ function recursivelyTraverseMutationEffects(root, parentFiber) {
  * @param {*} root 根节点
  */
 export function commitMutationEffectsOnFiber(finishedWork, root) {
+  const current = finishedWork.alternate;
+  const flags = finishedWork.flags;
   switch (finishedWork.tag) {
     case FunctionComponent:
     case HostRoot:
-    case HostComponent:
     case HostText: {
       //先遍历它们的子节点，处理它们的子节点上的副作用
       recursivelyTraverseMutationEffects(root, finishedWork);
       //再处理自己身上的副作用
       commitReconciliationEffects(finishedWork);
+      break;
+    }
+    case HostComponent: {
+      //先遍历它们的子节点，处理它们的子节点上的副作用
+      recursivelyTraverseMutationEffects(root, finishedWork);
+      //再处理自己身上的副作用
+      commitReconciliationEffects(finishedWork);
+      //处理DOM更新
+      if (flags & Update) {
+        //获取真实DOM
+        const instance = finishedWork.stateNode;
+        //更新真实DOM
+        if (instance !== null) {
+          const newProps = finishedWork.memoizedProps;
+          const oldProps =
+            current !== null ? current.memoizedProps : newProps;
+
+          const type = finishedWork.type;
+          const updatePayload = finishedWork.updateQueue;
+          finishedWork.updateQueue = null;
+
+          if (updatePayload) {
+            commitUpdate(
+              instance,
+              updatePayload,
+              type,
+              oldProps,
+              newProps,
+              finishedWork
+            );
+          }
+        }
+      }
       break;
     }
     default:

@@ -3,10 +3,16 @@ import {
   createTextInstance,
   createInstance,
   appendInitialChild,
-  finalizeInitialChildren
+  finalizeInitialChildren,
+  prepareUpdate
 } from 'react-dom-bindings/src/client/ReactDOMHostConfig';
-import { NoFlags } from './ReactFiberFlags';
-import { HostComponent, HostRoot, HostText } from './ReactWorkTags';
+import { NoFlags, Update } from './ReactFiberFlags';
+import {
+  HostComponent,
+  HostRoot,
+  HostText,
+  FunctionComponent
+} from './ReactWorkTags';
 
 /**
  * 把当前的完成的fiber所有的子节点对应的真实DOM都挂载到自己父parent真实DOM节点上
@@ -43,6 +49,59 @@ function appendAllChildren(parent, workInProgress) {
 }
 
 /**
+ * @description 向上冒泡属性
+ * @param completedWork 已完成的fiber
+ */
+function bubbleProperties(completedWork) {
+  let subtreeFlags = NoFlags;
+  //遍历当前fiber的所有子节点，把所有的子节的副作用，以及子节点的子节点的副作用全部合并
+  let child = completedWork.child;
+  while (child !== null) {
+    subtreeFlags |= child.subtreeFlags;
+    subtreeFlags |= child.flags;
+    child = child.sibling;
+  }
+  completedWork.subtreeFlags = subtreeFlags;
+}
+
+/**
+ * @description 标记更新
+ */
+function markUpdate(workInProgress) {
+  workInProgress.flags |= Update; //给当前的fiber添加更新的副作用
+}
+
+/**
+ * 在fiber(button)的完成阶段准备更新DOM
+ * @param {*} current button老fiber
+ * @param {*} workInProgress button的新fiber
+ * @param {*} type 类型 workInProgress.type
+ * @param {*} newProps 新属性
+ */
+function updateHostComponent(
+  current,
+  workInProgress,
+  type,
+  newProps
+) {
+  const oldProps = current.memoizedProps; //老的属性
+  const instance = workInProgress.stateNode; //老的DOM节点
+  //比较新老属性，收集属性的差异
+  const updatePayload = prepareUpdate(
+    instance, // 老的DOM节点
+    type, // 虚拟DOM类型
+    oldProps, // 老的属性
+    newProps // 新的属性
+  );
+  console.log('updatePayload', updatePayload);
+  //让原生组件的新fiber更新队列等于[]
+  workInProgress.updateQueue = updatePayload;
+  if (updatePayload) {
+    markUpdate(workInProgress);
+  }
+}
+
+/**
  * 完成一个fiber节点
  * @param {*} current 老fiber
  * @param {*} workInProgress 新的构建的fiber
@@ -61,22 +120,32 @@ export function completeWork(current, workInProgress) {
       break;
     // 原生节点的fiber
     case HostComponent:
-      //现在只是在处理创建或者说挂载新节点的逻辑，后面此处分进行区分是初次挂载还是更新
-
-      //创建真实的DOM节点
       const { type } = workInProgress;
-      const instance = createInstance(type, newProps, workInProgress);
 
-      //把自己所有的儿子都添加到自己的身上
-      appendAllChildren(instance, workInProgress);
+      if (current !== null && workInProgress.stateNode !== null) {
+        //如果老fiber存在，并且老fiber上有真实DOM节点，要走节点更新的逻辑
+        updateHostComponent(current, workInProgress, type, newProps);
+      } else {
+        //创建或者说挂载新节点的情况
 
-      // 将真实DOM挂到当前fiber的stateNode上
-      workInProgress.stateNode = instance;
-
-      // 完成真实DOM的构建
-      finalizeInitialChildren(instance, type, newProps);
-
+        //创建真实的DOM节点
+        const instance = createInstance(
+          type,
+          newProps,
+          workInProgress
+        );
+        //把自己所有的儿子都添加到自己的身上
+        appendAllChildren(instance, workInProgress);
+        // 将真实DOM挂到当前fiber的stateNode上
+        workInProgress.stateNode = instance;
+        // 完成真实DOM的构建
+        finalizeInitialChildren(instance, type, newProps);
+      }
       //向上冒泡属性
+      bubbleProperties(workInProgress);
+      break;
+    // 函数组件的fiber
+    case FunctionComponent:
       bubbleProperties(workInProgress);
       break;
     // 文本节点的fiber
@@ -89,20 +158,4 @@ export function completeWork(current, workInProgress) {
       bubbleProperties(workInProgress);
       break;
   }
-}
-
-/**
- * @description 向上冒泡属性
- * @param completedWork 已完成的fiber
- */
-function bubbleProperties(completedWork) {
-  let subtreeFlags = NoFlags;
-  //遍历当前fiber的所有子节点，把所有的子节的副作用，以及子节点的子节点的副作用全部合并
-  let child = completedWork.child;
-  while (child !== null) {
-    subtreeFlags |= child.subtreeFlags;
-    subtreeFlags |= child.flags;
-    child = child.sibling;
-  }
-  completedWork.subtreeFlags = subtreeFlags;
 }

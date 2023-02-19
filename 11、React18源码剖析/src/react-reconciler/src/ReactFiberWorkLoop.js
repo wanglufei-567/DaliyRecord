@@ -10,9 +10,11 @@ import {
 } from './ReactFiberFlags';
 import { commitMutationEffectsOnFiber } from './ReactFiberCommitWork';
 import { HostComponent, HostRoot, HostText } from './ReactWorkTags';
+import { finishQueueingConcurrentUpdates } from './ReactFiberConcurrentUpdates';
 
 // 正在进行中的工作，也就是正在计算中的fiber
 let workInProgress = null;
+let workInProgressRoot = null;
 
 /**
  * @description 在fiber上调度更新 也就是计划更新root
@@ -20,6 +22,8 @@ let workInProgress = null;
  * @param root 根节点
  */
 export function scheduleUpdateOnFiber(root) {
+  if (workInProgressRoot) return;
+  workInProgressRoot = root;
   // 确保调度执行root上的更新
   ensureRootIsScheduled(root);
 }
@@ -29,8 +33,8 @@ export function scheduleUpdateOnFiber(root) {
  */
 function ensureRootIsScheduled(root) {
   //告诉浏览器要执行performConcurrentWorkOnRoot
-  // scheduleCallback(performConcurrentWorkOnRoot.bind(null, root));
-  performConcurrentWorkOnRoot.bind(null, root)();
+  scheduleCallback(performConcurrentWorkOnRoot.bind(null, root));
+  // performConcurrentWorkOnRoot.bind(null, root)();
 }
 
 /**
@@ -47,13 +51,14 @@ function performConcurrentWorkOnRoot(root) {
   const finishedWork = root.current.alternate;
   root.finishedWork = finishedWork;
   commitRoot(root);
+  workInProgressRoot = null;
 }
 
 /**
  * @description 提交方法
  * @param root 根节点
  */
- function commitRoot(root) {
+function commitRoot(root) {
   const { finishedWork } = root;
 
   // printFinishedWork(finishedWork);
@@ -72,7 +77,6 @@ function performConcurrentWorkOnRoot(root) {
   root.current = finishedWork;
 }
 
-
 /**
  * @description 渲染方法
  */
@@ -89,6 +93,7 @@ function renderRootSync(root) {
 function prepareFreshStack(root) {
   // 创建一个workInProgress（执行中的工作）
   workInProgress = createWorkInProgress(root.current, null);
+  finishQueueingConcurrentUpdates();
 }
 
 /**
@@ -148,7 +153,6 @@ function completeUnitOfWork(unitOfWork) {
   } while (completedWork !== null);
 }
 
-
 function printFinishedWork(fiber) {
   let child = fiber.child;
   while (child) {
@@ -156,7 +160,12 @@ function printFinishedWork(fiber) {
     child = child.sibling;
   }
   if (fiber.flags !== 0) {
-    console.log(getFlags(fiber.flags), getTag(fiber.tag), fiber.type, fiber.memoizedProps);
+    console.log(
+      getFlags(fiber.flags),
+      getTag(fiber.tag),
+      fiber.type,
+      fiber.memoizedProps
+    );
   }
 }
 
