@@ -194,12 +194,12 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
 
           if (updatePayload) {
             commitUpdate(
-              instance,
-              updatePayload,
-              type,
-              oldProps,
-              newProps,
-              finishedWork
+              instance, // 真实DOM
+              updatePayload, // 更新内容
+              type, // 真实DOM type
+              oldProps, // 老props
+              newProps, // 新Props
+              finishedWork // 当前的fiber节点
             );
           }
         }
