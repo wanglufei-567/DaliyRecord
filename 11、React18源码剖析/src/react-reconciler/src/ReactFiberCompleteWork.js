@@ -93,7 +93,6 @@ function updateHostComponent(
     oldProps, // 老的属性
     newProps // 新的属性
   );
-  console.log('updatePayload', updatePayload);
   //让原生组件的新fiber更新队列等于[]
   workInProgress.updateQueue = updatePayload;
   if (updatePayload) {

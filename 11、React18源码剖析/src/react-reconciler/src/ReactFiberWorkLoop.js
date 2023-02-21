@@ -6,10 +6,16 @@ import {
   NoFlags,
   MutationMask,
   Placement,
-  Update
+  Update,
+  ChildDeletion
 } from './ReactFiberFlags';
 import { commitMutationEffectsOnFiber } from './ReactFiberCommitWork';
-import { HostComponent, HostRoot, HostText } from './ReactWorkTags';
+import {
+  FunctionComponent,
+  HostComponent,
+  HostRoot,
+  HostText
+} from './ReactWorkTags';
 import { finishQueueingConcurrentUpdates } from './ReactFiberConcurrentUpdates';
 
 // 正在进行中的工作，也就是正在计算中的fiber
@@ -19,7 +25,7 @@ let workInProgressRoot = null;
 /**
  * @description 在fiber上调度更新 也就是计划更新root
  * 源码中此处有一个任务的功能，这里后续再实现
- * @param root 根节点
+ * @param root 根 FiberRootNode
  */
 export function scheduleUpdateOnFiber(root) {
   if (workInProgressRoot) return;
@@ -41,14 +47,15 @@ function ensureRootIsScheduled(root) {
  * @description 执行root上的并发更新工作
  * @description 根据虚拟DOM构建fiber树,要创建真实的DOM节点
  * @description 还需要把真实的DOM节点插入容器
- * @param root 根节点
+ * @param root  根 FiberRootNode
  */
 function performConcurrentWorkOnRoot(root) {
   //第一次渲染以同步的方式渲染根节点，初次渲染的时候，都是同步
   renderRootSync(root);
 
-  //开始进入提交 阶段，就是执行副作用，修改真实DOM
+  //开始进入提交阶段，就是执行副作用，修改真实DOM
   const finishedWork = root.current.alternate;
+  // FiberRootNode上记录新HostRootFiber
   root.finishedWork = finishedWork;
   commitRoot(root);
   workInProgressRoot = null;
@@ -60,9 +67,7 @@ function performConcurrentWorkOnRoot(root) {
  */
 function commitRoot(root) {
   const { finishedWork } = root;
-
-  // printFinishedWork(finishedWork);
-
+  printFinishedWork(finishedWork);
   //判断子树有没有副作用
   const subtreeHasEffects =
     (finishedWork.subtreeFlags & MutationMask) !== NoFlags;
@@ -154,33 +159,50 @@ function completeUnitOfWork(unitOfWork) {
 }
 
 function printFinishedWork(fiber) {
+  const { flags, deletions } = fiber;
+  if ((flags & ChildDeletion) !== NoFlags) {
+    fiber.flags &= ~ChildDeletion;
+    console.log(
+      '子节点有删除' +
+        deletions
+          .map(fiber => `${fiber.type}#${fiber.memoizedProps.id}`)
+          .join(',')
+    );
+  }
   let child = fiber.child;
   while (child) {
     printFinishedWork(child);
     child = child.sibling;
   }
-  if (fiber.flags !== 0) {
+
+  if (fiber.flags !== NoFlags) {
     console.log(
-      getFlags(fiber.flags),
+      getFlags(fiber),
       getTag(fiber.tag),
-      fiber.type,
+      typeof fiber.type === 'function' ? fiber.type.name : fiber.type,
       fiber.memoizedProps
     );
   }
 }
-
-function getFlags(flags) {
+function getFlags(fiber) {
+  const { flags } = fiber;
+  if (flags === (Placement | Update)) {
+    return '移动';
+  }
   if (flags === Placement) {
     return '插入';
   }
   if (flags === Update) {
     return '更新';
   }
+
   return flags;
 }
 
 function getTag(tag) {
   switch (tag) {
+    case FunctionComponent:
+      return 'FunctionComponent';
     case HostRoot:
       return 'HostRoot';
     case HostComponent:

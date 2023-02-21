@@ -46,6 +46,8 @@ export function FiberNode(tag, pendingProps, key) {
 
   // 索引 表明当前fiber在兄弟fiber间的位置
   this.index = 0;
+
+  this.deletions = null;
 }
 
 /**

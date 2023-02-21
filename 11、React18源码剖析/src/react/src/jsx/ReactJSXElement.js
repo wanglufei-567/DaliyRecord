@@ -11,12 +11,6 @@ const RESERVED_PROPS = {
   __source: true
 }
 
-/**
- * 校验key属性是否有效
- */
-function hasValidKey(config) {
-  return config.key !== undefined;
-}
 
 /**
  * 校验ref属性是否有效
@@ -45,10 +39,12 @@ function ReactElement(type, key, ref, props) {
 
 /**
  * @description 将JSX转换为虚拟DOM的方法，Babel编译JSX之后的结果就是此函数的调用
+ * React17以前老版的转换函数中key 是放在config里的,第三个参数放children
+ * React17之后新版的转换函数中key是在第三个参数中的，children是放在config里的
  * @param type 元素类型
  * @param config babel转译JSX之后，根据原始JSX自动生成的配置信息
  */
-export function jsxDEV(type, config) {
+export function jsxDEV(type, config, maybeKey) {
   // 属性名
   let propName;
   // 属性对象
@@ -58,8 +54,8 @@ export function jsxDEV(type, config) {
   //可以通过ref实现获取真实DOM的需求
   let ref = null;
 
-  if (hasValidKey(config)) {
-    key = config.key;
+  if (typeof maybeKey !== 'undefined') {
+    key = maybeKey;
   }
   if (hasValidRef(config)) {
     ref = config.ref;
