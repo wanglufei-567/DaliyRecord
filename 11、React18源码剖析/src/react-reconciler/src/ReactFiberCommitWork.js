@@ -8,7 +8,8 @@ import {
   Placement,
   MutationMask,
   Update,
-  Passive
+  Passive,
+  LayoutMask
 } from './ReactFiberFlags';
 import {
   FunctionComponent,
@@ -18,7 +19,8 @@ import {
 } from './ReactWorkTags';
 import {
   HasEffect as HookHasEffect,
-  Passive as HookPassive
+  Passive as HookPassive,
+  Layout as HookLayout
 } from './ReactHookEffectTags';
 
 // 原生的父节点 真实DOM
@@ -462,4 +464,41 @@ function commitHookEffectListMount(flags, finishedWork) {
       effect = effect.next;
     } while (effect !== firstEffect);
   }
+}
+
+
+export function commitLayoutEffects(finishedWork, root) {
+  //老的根fiber
+  const current = finishedWork.alternate;
+  commitLayoutEffectOnFiber(root, current, finishedWork);
+}
+
+function commitLayoutEffectOnFiber(finishedRoot, current, finishedWork) {
+  const flags = finishedWork.flags;
+  switch (finishedWork.tag) {
+    case HostRoot: {
+      recursivelyTraverseLayoutEffects(finishedRoot, finishedWork);
+      break;
+    }
+    case FunctionComponent: {
+      recursivelyTraverseLayoutEffects(finishedRoot, finishedWork);
+      if (flags & LayoutMask) {// LayoutMask=Update=4
+        commitHookLayoutEffects(finishedWork, HookHasEffect | HookLayout);
+      }
+      break;
+    }
+  }
+}
+function recursivelyTraverseLayoutEffects(root, parentFiber) {
+  if (parentFiber.subtreeFlags & LayoutMask) {
+    let child = parentFiber.child;
+    while (child !== null) {
+      const current = child.alternate;
+      commitLayoutEffectOnFiber(root, current, child);
+      child = child.sibling;
+    }
+  }
+}
+function commitHookLayoutEffects(finishedWork, hookFlags) {
+  commitHookEffectListMount(hookFlags, finishedWork);
 }
