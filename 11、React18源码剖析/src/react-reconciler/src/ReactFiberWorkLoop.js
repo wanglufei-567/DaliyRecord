@@ -7,9 +7,14 @@ import {
   MutationMask,
   Placement,
   Update,
-  ChildDeletion
+  ChildDeletion,
+  Passive
 } from './ReactFiberFlags';
-import { commitMutationEffectsOnFiber } from './ReactFiberCommitWork';
+import {
+  commitMutationEffectsOnFiber, //执行DOM操作
+  commitPassiveUnmountEffects, //执行destroy
+  commitPassiveMountEffects //执行create
+} from './ReactFiberCommitWork';
 import {
   FunctionComponent,
   HostComponent,
@@ -21,6 +26,10 @@ import { finishQueueingConcurrentUpdates } from './ReactFiberConcurrentUpdates';
 // 正在进行中的工作，也就是正在计算中的fiber
 let workInProgress = null;
 let workInProgressRoot = null;
+//此根节点上有没有useEffect类似的副作用
+let rootDoesHavePassiveEffect = false;
+//具有useEffect副作用的根节点 FiberRootNode,根fiber.stateNode
+let rootWithPendingPassiveEffects = null;
 
 /**
  * @description 在fiber上调度更新 也就是计划更新root
@@ -62,12 +71,39 @@ function performConcurrentWorkOnRoot(root) {
 }
 
 /**
+ * @description 执行卸载副作用 和 挂载副作用
+ */
+function flushPassiveEffect() {
+  if (rootWithPendingPassiveEffects !== null) {
+    const root = rootWithPendingPassiveEffects;
+    //执行卸载副作用，destroy
+    commitPassiveUnmountEffects(root.current);
+    //执行挂载副作用 create
+    commitPassiveMountEffects(root, root.current);
+  }
+}
+
+/**
  * @description 提交方法
  * @param root 根节点
  */
 function commitRoot(root) {
   const { finishedWork } = root;
-  printFinishedWork(finishedWork);
+  // printFinishedWork(finishedWork);
+
+  //若是新的fiber树上有Passive则说明有函数组件使用了useEffect
+  if (
+    (finishedWork.subtreeFlags & Passive) !== NoFlags ||
+    (finishedWork.flags & Passive) !== NoFlags
+  ) {
+    //若此根节点上有useEffect类似的副作用
+    if (!rootDoesHavePassiveEffect) {
+      // scheduleCallback会开启一个新的宏任务，只需执行一次即可
+      rootDoesHavePassiveEffect = true;
+      scheduleCallback(flushPassiveEffect);
+    }
+  }
+  console.log('~~~~~~~~~~~~DOM执行变更前~~~~~~~~~~~~~~~~~~');
   //判断子树有没有副作用
   const subtreeHasEffects =
     (finishedWork.subtreeFlags & MutationMask) !== NoFlags;
@@ -76,10 +112,18 @@ function commitRoot(root) {
   //如果自己的副作用或者子节点有副作用就进行提交DOM操作
   if (subtreeHasEffects || rootHasEffect) {
     commitMutationEffectsOnFiber(finishedWork, root);
-  }
+    console.log('~~~~~~~~~~~~DOM执行变更后~~~~~~~~~~~~~~~~~~');
 
-  //等DOM变更后，就可以把让root的current指向新的fiber树
-  root.current = finishedWork;
+    //当DOM执行变更之后
+    if (rootDoesHavePassiveEffect) {
+      rootDoesHavePassiveEffect = false;
+      // 具有useEffect副作用的根节点
+      rootWithPendingPassiveEffects = root;
+    }
+
+    //等DOM变更后，就可以把让root的current指向新的fiber树
+    root.current = finishedWork;
+  }
 }
 
 /**

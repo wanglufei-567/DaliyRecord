@@ -4,13 +4,22 @@ import {
   commitUpdate,
   removeChild
 } from 'react-dom-bindings/src/client/ReactDOMHostConfig';
-import { Placement, MutationMask, Update } from './ReactFiberFlags';
+import {
+  Placement,
+  MutationMask,
+  Update,
+  Passive
+} from './ReactFiberFlags';
 import {
   FunctionComponent,
   HostComponent,
   HostRoot,
   HostText
 } from './ReactWorkTags';
+import {
+  HasEffect as HookHasEffect,
+  Passive as HookPassive
+} from './ReactHookEffectTags';
 
 // 原生的父节点 真实DOM
 let hostParent = null;
@@ -302,5 +311,155 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
     }
     default:
       break;
+  }
+}
+
+/**
+ * @description 执行卸载副作用，destroy
+ * @param finishedWork 根fiber
+ */
+export function commitPassiveUnmountEffects(finishedWork) {
+  commitPassiveUnmountOnFiber(finishedWork);
+}
+
+function commitPassiveUnmountOnFiber(finishedWork) {
+  const flags = finishedWork.flags;
+  switch (finishedWork.tag) {
+    case HostRoot: {
+      recursivelyTraversePassiveUnmountEffects(finishedWork);
+      break;
+    }
+    case FunctionComponent: {
+      // 先处理子节点的
+      recursivelyTraversePassiveUnmountEffects(finishedWork);
+      // 再处理自己
+      if (flags & Passive) {
+        // 如果函数组件的里面使用了useEffect,那么此函数组件对应的fiber上会有一个Passive flag
+        commitHookPassiveUnmountEffects(
+          finishedWork,
+          HookHasEffect | HookPassive
+        );
+      }
+      break;
+    }
+  }
+}
+/**
+ * @description 递归遍历子fiber节点,处理子节点的副作用
+ */
+function recursivelyTraversePassiveUnmountEffects(parentFiber) {
+  if (parentFiber.subtreeFlags & Passive) {
+    let child = parentFiber.child;
+    while (child !== null) {
+      commitPassiveUnmountOnFiber(child);
+      child = child.sibling;
+    }
+  }
+}
+
+/**
+ * @description 执行自己的卸载副作用
+ */
+function commitHookPassiveUnmountEffects(finishedWork, hookFlags) {
+  commitHookEffectListUnmount(hookFlags, finishedWork);
+}
+
+/**
+ * @description 提交卸载副作用
+ */
+function commitHookEffectListUnmount(flags, finishedWork) {
+  // 获取函数组件上的更新队列
+  const updateQueue = finishedWork.updateQueue;
+  const lastEffect =
+    updateQueue !== null ? updateQueue.lastEffect : null;
+
+  if (lastEffect !== null) {
+    //获取 第一个effect
+    const firstEffect = lastEffect.next;
+    let effect = firstEffect;
+    do {
+      //如果此effect的tag和传入的fiber flag相同
+      //都是 HookHasEffect | PassiveEffect
+      if ((effect.tag & flags) === flags) {
+        const destroy = effect.destroy;
+        if (destroy !== undefined) {
+          // 执行卸载副作用函数
+          destroy();
+        }
+      }
+      effect = effect.next;
+    } while (effect !== firstEffect);
+  }
+}
+
+/**
+ * @description 执行挂载副作用 create
+ * @param finishedWork 根fiber
+ */
+export function commitPassiveMountEffects(root, finishedWork) {
+  commitPassiveMountOnFiber(root, finishedWork);
+}
+
+function commitPassiveMountOnFiber(finishedRoot, finishedWork) {
+  const flags = finishedWork.flags;
+  switch (finishedWork.tag) {
+    case HostRoot: {
+      recursivelyTraversePassiveMountEffects(
+        finishedRoot,
+        finishedWork
+      );
+      break;
+    }
+    case FunctionComponent: {
+      // 先处理子节点
+      recursivelyTraversePassiveMountEffects(
+        finishedRoot,
+        finishedWork
+      );
+      // 再处理自己
+      if (flags & Passive) {
+        // 如果函数组件的里面使用了useEffect,那么此函数组件对应的fiber上会有一个Passive flag
+        commitHookPassiveMountEffects(
+          finishedWork,
+          HookHasEffect | HookPassive
+        );
+      }
+      break;
+    }
+  }
+}
+function recursivelyTraversePassiveMountEffects(root, parentFiber) {
+  if (parentFiber.subtreeFlags & Passive) {
+    let child = parentFiber.child;
+    while (child !== null) {
+      commitPassiveMountOnFiber(root, child);
+      child = child.sibling;
+    }
+  }
+}
+function commitHookPassiveMountEffects(finishedWork, hookFlags) {
+  commitHookEffectListMount(hookFlags, finishedWork);
+}
+/**
+ * @description 提交挂载副作用
+ */
+function commitHookEffectListMount(flags, finishedWork) {
+  const updateQueue = finishedWork.updateQueue;
+  const lastEffect =
+    updateQueue !== null ? updateQueue.lastEffect : null;
+  if (lastEffect !== null) {
+    //获取 第一个effect
+    const firstEffect = lastEffect.next;
+    let effect = firstEffect;
+    do {
+      //如果此effect tag和传入的fiber flags 相同
+      //都是 HookHasEffect | PassiveEffect
+      if ((effect.tag & flags) === flags) {
+        const create = effect.create;
+        // 执行挂载副作用函数，并将其返回值，也就是卸载副作用赋值给effect的destroy
+        effect.destroy = create();
+      }
+      effect = effect.next;
+    } while (effect !== firstEffect);
   }
 }
