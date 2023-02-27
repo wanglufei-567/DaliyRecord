@@ -1,4 +1,8 @@
-import { scheduleCallback } from 'scheduler';
+import {
+  scheduleCallback,
+  NormalPriority as NormalSchedulerPriority,
+  shouldYield,
+} from "scheduler";
 import { createWorkInProgress } from './ReactFiber';
 import { beginWork } from './ReactFiberBeginWork';
 import { completeWork } from './ReactFiberCompleteWork';
@@ -49,7 +53,7 @@ export function scheduleUpdateOnFiber(root) {
  */
 function ensureRootIsScheduled(root) {
   //告诉浏览器要执行performConcurrentWorkOnRoot
-  scheduleCallback(performConcurrentWorkOnRoot.bind(null, root));
+  scheduleCallback(NormalSchedulerPriority, performConcurrentWorkOnRoot.bind(null, root));
   // performConcurrentWorkOnRoot.bind(null, root)();
 }
 
@@ -102,7 +106,7 @@ function commitRoot(root) {
     if (!rootDoesHavePassiveEffect) {
       // scheduleCallback会开启一个新的宏任务，只需执行一次即可
       rootDoesHavePassiveEffect = true;
-      scheduleCallback(flushPassiveEffect);
+      scheduleCallback(NormalSchedulerPriority, performConcurrentWorkOnRoot.bind(null, root));
     }
   }
   console.log('~~~~~~~~~~~~DOM执行变更前~~~~~~~~~~~~~~~~~~');
@@ -125,6 +129,12 @@ function commitRoot(root) {
 
     //等DOM变更后，就可以把让root的current指向新的fiber树
     root.current = finishedWork;
+  }
+}
+function workLoopConcurrent() {
+  //如果有下一个要构建的fiber并且时间片没有过期
+  while (workInProgress !== null && !shouldYield()) {
+    performUnitOfWork(workInProgress);
   }
 }
 
