@@ -50,7 +50,7 @@ port1.onmessage = performWorkUntilDeadline;
  * @param {*} priorityLevel 优先级
  * @param {*} callback 任务回调
  */
-export function scheduleCallback(priorityLevel, callback) {
+function scheduleCallback(priorityLevel, callback) {
   // 获取当前的时候
   const currentTime = getCurrentTime();
   // 此任务的开时间
@@ -93,7 +93,8 @@ export function scheduleCallback(priorityLevel, callback) {
   //向任务最小堆里添加任务，排序的依据是过期时间
   push(taskQueue, newTask);
 
-  //flushWork执行工作，刷新工作，执行任务
+  //flushWork执行工作，刷新工作，执行任务，
+  // 将任务提交到浏览器的任务队列中，并在下一个浏览器帧中执行
   requestHostCallback(workLoop);
   return newTask;
 }
@@ -202,12 +203,13 @@ function performWorkUntilDeadline() {
 }
 
 export {
+  scheduleCallback as unstable_scheduleCallback,
   shouldYieldToHost as shouldYield,
-  ImmediatePriority,
-  UserBlockingPriority,
-  NormalPriority,
-  LowPriority,
-  IdlePriority
+  ImmediatePriority as unstable_ImmediatePriority,
+  UserBlockingPriority as unstable_UserBlockingPriority,
+  NormalPriority as unstable_NormalPriority,
+  LowPriority as unstable_LowPriority,
+  IdlePriority as unstable_IdlePriority
 };
 
 /*

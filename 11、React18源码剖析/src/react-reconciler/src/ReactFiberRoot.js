@@ -1,5 +1,6 @@
 import { createHostRootFiber } from './ReactFiber';
 import { initialUpdateQueue } from './ReactFiberClassUpdateQueue';
+import { NoLanes } from './ReactFiberLane';
 
 /**
  * @description FiberRootNode的构造函数，用于创建fiber根节点
@@ -11,6 +12,9 @@ function FiberRootNode(containerInfo) {
   fiber根节点上的containerInfo直接就是真实DOM，div#root
   */
   this.containerInfo = containerInfo;
+
+  //表示此根上有哪些赛道等待被处理
+  this.pendingLanes = NoLanes;
 }
 
 /**

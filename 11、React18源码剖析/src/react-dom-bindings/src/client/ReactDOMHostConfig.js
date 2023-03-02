@@ -7,6 +7,8 @@ import {
   preCacheFiberNode,
   updateFiberProps
 } from './ReactDOMComponentTree';
+import { DefaultEventPriority } from 'react-reconciler/src/ReactEventPriorities';
+import { getEventPriority } from '../events/ReactDOMEventListener';
 
 export function shouldSetTextContent(type, props) {
   return (
@@ -67,11 +69,37 @@ export function prepareUpdate(domElement, type, oldProps, newProps) {
   return diffProperties(domElement, type, oldProps, newProps);
 }
 
-export function commitUpdate(domElement, updatePayload, type, oldProps, newProps) {
-  updateProperties(domElement, updatePayload, type, oldProps, newProps);
+export function commitUpdate(
+  domElement,
+  updatePayload,
+  type,
+  oldProps,
+  newProps
+) {
+  updateProperties(
+    domElement,
+    updatePayload,
+    type,
+    oldProps,
+    newProps
+  );
   updateFiberProps(domElement, newProps);
 }
 
 export function removeChild(parentInstance, child) {
   parentInstance.removeChild(child);
+}
+
+/**
+ * @description 获取当前事件优先级
+ * 若是没有事件，则返回默认事件车道 16
+ */
+export function getCurrentEventPriority() {
+  const currentEvent = window.event;
+  if (currentEvent === undefined) {
+    //默认事件车道 DefaultLane 16
+    return DefaultEventPriority;
+  }
+  // 根据当前事件类型获取事件优先级
+  return getEventPriority(currentEvent.type);
 }
