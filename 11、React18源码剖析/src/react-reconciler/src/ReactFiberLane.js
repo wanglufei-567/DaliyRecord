@@ -62,7 +62,7 @@ export function includesNonIdleWork(lanes) {
 }
 
 /**
- * @description 判断当前车道是否包含阻塞型的NoLanes
+ * @description 判断当前车道是否包含阻塞型的Lanes
  */
 export function includesBlockingLane(root, lanes) {
   const SyncDefaultLanes = InputContinuousLane | DefaultLane;

@@ -137,15 +137,18 @@ function ensureRootIsScheduled(root) {
  * @description 还需要把真实的DOM节点插入容器
  * @param root  根 FiberRootNode
  */
-function performConcurrentWorkOnRoot(root) {
+function performConcurrentWorkOnRoot(root, didTimeout) {
   //获取root上当前优先级最高的车道， 初次渲染时是默认事件车道 DefaultLane 16
-  const nextLanes = getNextLanes(root, NoLanes); //16
-  if (nextLanes === NoLanes) {
+  const lanes = getNextLanes(root, NoLanes); //16
+  if (lanes === NoLanes) {
     return null;
   }
 
+  //如果不包含阻塞的车道，并且没有超时，就可以并行渲染,就是启用时间分片
+  //所以说默认更新车道是同步的,不能启用时间分片
   const shouldTimeSlice =
     !includesBlockingLane(root, lanes) && !didTimeout;
+    console.log('shouldTimeSlice', shouldTimeSlice)
   if (shouldTimeSlice) {
     renderRootConcurrent(root, lanes);
   } else {
@@ -204,7 +207,7 @@ function commitRoot(root) {
       );
     }
   }
-  console.log('~~~~~~~~~~~~DOM执行变更前~~~~~~~~~~~~~~~~~~');
+  // console.log('~~~~~~~~~~~~DOM执行变更前~~~~~~~~~~~~~~~~~~');
   //判断子树有没有副作用
   const subtreeHasEffects =
     (finishedWork.subtreeFlags & MutationMask) !== NoFlags;
@@ -214,7 +217,7 @@ function commitRoot(root) {
   //如果自己的副作用或者子节点有副作用就进行提交DOM操作
   if (subtreeHasEffects || rootHasEffect) {
     commitMutationEffectsOnFiber(finishedWork, root);
-    console.log('~~~~~~~~~~~~DOM执行变更后~~~~~~~~~~~~~~~~~~');
+    // console.log('~~~~~~~~~~~~DOM执行变更后~~~~~~~~~~~~~~~~~~');
     commitLayoutEffects(finishedWork, root);
     //当DOM执行变更之后
     if (rootDoesHavePassiveEffect) {

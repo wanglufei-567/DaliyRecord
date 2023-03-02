@@ -149,6 +149,7 @@ function workLoop(startTime) {
     //取出当前的任务中的回调函数 performConcurrentWorkOnRoot
     const callback = currentTask.callback;
     if (typeof callback === 'function') {
+      // 先清空任务上的回调
       currentTask.callback = null;
       //执行工作，如果返回新的函数，则表示当前的工作没有完成
       const didUserCallbackTimeout =
