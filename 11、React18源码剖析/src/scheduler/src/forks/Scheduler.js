@@ -205,7 +205,7 @@ function performWorkUntilDeadline() {
 
 export {
   scheduleCallback as unstable_scheduleCallback,
-  shouldYieldToHost as shouldYield,
+  shouldYieldToHost as unstable_shouldYield,
   ImmediatePriority as unstable_ImmediatePriority,
   UserBlockingPriority as unstable_UserBlockingPriority,
   NormalPriority as unstable_NormalPriority,

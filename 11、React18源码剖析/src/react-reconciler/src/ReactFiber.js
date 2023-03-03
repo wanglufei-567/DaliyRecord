@@ -1,5 +1,7 @@
 import { HostComponent, HostRoot, IndeterminateComponent, HostText } from "./ReactWorkTags";
 import { NoFlags } from './ReactFiberFlags';
+import { NoLanes } from './ReactFiberLane';
+
 
 /**
  * @description 创建fiber节点的方法， 每个虚拟DOM=>Fiber节点=>真实DOM
@@ -48,6 +50,8 @@ export function FiberNode(tag, pendingProps, key) {
   this.index = 0;
 
   this.deletions = null;
+  // fiber上的车道，默认值是NoLanes
+  this.lanes = NoLanes;
 }
 
 /**

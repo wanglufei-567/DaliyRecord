@@ -1,5 +1,8 @@
 import ReactSharedInternals from 'shared/ReactSharedInternals';
-import { scheduleUpdateOnFiber } from './ReactFiberWorkLoop';
+import {
+  scheduleUpdateOnFiber,
+  requestUpdateLane
+} from './ReactFiberWorkLoop';
 import { enqueueConcurrentHookUpdate } from './ReactFiberConcurrentUpdates';
 import {
   Passive as PassiveEffect,
@@ -10,6 +13,7 @@ import {
   Passive as HookPassive,
   Layout as HookLayout
 } from './ReactHookEffectTags';
+import { NoLane, NoLanes } from './ReactFiberLane';
 
 const { ReactCurrentDispatcher } = ReactSharedInternals;
 
@@ -38,7 +42,9 @@ function mountReducer(reducer, initialArg) {
   hook.memoizedState = initialArg;
   const queue = {
     pending: null,
-    dispatch: null
+    dispatch: null,
+    lastRenderedReducer: reducer,
+    lastRenderedState: initialArg
   };
   hook.queue = queue;
   const dispatch = (queue.dispatch = dispatchReducerAction.bind(
@@ -103,6 +109,9 @@ function baseStateReducer(state, action) {
  * @param {*} action 派发的动作
  */
 function dispatchSetState(fiber, queue, action) {
+  // 获取当前的更新赛道 1
+  const lane = requestUpdateLane();
+
   // 创建更新对象
   const update = {
     action,
@@ -110,19 +119,26 @@ function dispatchSetState(fiber, queue, action) {
     eagerState: null, //急切的更新状态
     next: null
   };
+  const alternate = fiber.alternate;
 
-  //当用户派发动作后，立刻用上一次的状态和上一次的reducer计算新状态
-  const { lastRenderedReducer, lastRenderedState } = queue;
-  const eagerState = lastRenderedReducer(lastRenderedState, action);
-  update.hasEagerState = true;
-  update.eagerState = eagerState;
-  //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
-  if (Object.is(eagerState, lastRenderedState)) {
-    return;
+  if (
+    fiber.lanes === NoLanes &&
+    (alternate === null || alternate.lanes == NoLanes)
+  ) {
+    //先获取队列上的老的状态和老的reducer
+    const { lastRenderedReducer, lastRenderedState } = queue;
+    //使用上次的状态和上次的reducer结合本次action进行计算新状态
+    const eagerState = lastRenderedReducer(lastRenderedState, action);
+    update.hasEagerState = true;
+    update.eagerState = eagerState;
+    //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
+    if (Object.is(eagerState, lastRenderedState)) {
+      return;
+    }
   }
   //下面是真正的入队更新，并调度更新逻辑
-  const root = enqueueConcurrentHookUpdate(fiber, queue, update);
-  scheduleUpdateOnFiber(root);
+  const root = enqueueConcurrentHookUpdate(fiber, queue, update, lane);
+  scheduleUpdateOnFiber(root, fiber, lane);
 }
 
 /* ----------------------------------------------------------------------- */

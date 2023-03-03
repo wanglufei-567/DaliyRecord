@@ -1,3 +1,5 @@
+import { allowConcurrentByDefault } from 'shared/ReactFeatureFlags';
+
 export const TotalLanes = 31;
 //没有车道，所有位都为0
 export const NoLanes = 0b0000000000000000000000000000000;
@@ -65,6 +67,11 @@ export function includesNonIdleWork(lanes) {
  * @description 判断当前车道是否包含阻塞型的Lanes
  */
 export function includesBlockingLane(root, lanes) {
+  //如果允许默认并行渲染
+  if (allowConcurrentByDefault) {
+    return false;
+  }
+
   const SyncDefaultLanes = InputContinuousLane | DefaultLane;
   return (lanes & SyncDefaultLanes) !== NoLanes;
 }
