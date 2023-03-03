@@ -4,7 +4,8 @@ import {
   ImmediatePriority as ImmediateSchedulerPriority,
   UserBlockingPriority as UserBlockingSchedulerPriority,
   NormalPriority as NormalSchedulerPriority,
-  IdlePriority as IdleSchedulerPriority
+  IdlePriority as IdleSchedulerPriority,
+  cancelCallback as Scheduler_cancelCallback
 } from './scheduler';
 import { createWorkInProgress } from './ReactFiber';
 import { beginWork } from './ReactFiberBeginWork';
@@ -36,7 +37,8 @@ import {
   getNextLanes,
   getHighestPriorityLane,
   SyncLane,
-  includesBlockingLane
+  includesBlockingLane,
+  NoLane
 } from './ReactFiberLane';
 import {
   getCurrentUpdatePriority,
@@ -88,8 +90,10 @@ export function scheduleUpdateOnFiber(root, fiber, lane) {
  * @description 确保执行root上的更新
  */
 function ensureRootIsScheduled(root) {
+  //先获取当前根上执行任务
+  const existingCallbackNode = root.callbackNode;
   //获取当前优先级最高的车道
-  const nextLanes = getNextLanes(root, NoLanes); //16
+  const nextLanes = getNextLanes(root, workInProgressRootRenderLanes); //16
   //如果没有要执行的任务
   if (nextLanes === NoLanes) {
     return;
@@ -98,7 +102,38 @@ function ensureRootIsScheduled(root) {
   //获取新的调度优先级
   let newCallbackPriority = getHighestPriorityLane(nextLanes); //16
   //新的回调任务
-  let newCallbackNode;
+  let newCallbackNode = null;
+
+  //获取现在根上正在运行的优先级
+  const existingCallbackPriority = root.callbackPriority;
+
+  /**
+   * 如果新的优先级和老的优先级一样，则可以进行批量更新
+   * 为何能批量更新？
+   * 因为不管后面走同步渲染（微任务）还是并发渲染（宏任务）
+   * 都是在同步代码走完之后才执行的，也就是说渲染都是在同步逻辑走完之后进行的
+   * 那当组件中多次更新并调用scheduleUpdateOnFiber时
+   * 就没有必要多次创建微任务和宏任务，一个就可以了
+   * 因为所有的更新都在concurrentQueues这个全局变量上了
+   * 后面prepareFreshStack时会将更新挂到对应的fiber上
+   * 这样一次渲染就可以完成所有更新
+   */
+  if (existingCallbackPriority === newCallbackPriority) {
+    return;
+  }
+
+  /**
+   * 高优先级打断低优先级
+   * existingCallbackNode表示当前当前根上执行任务
+   * 调用Scheduler_cancelCallback会将当前任务的callback置空
+   * scheduler中workLoop时会将该任务弹出
+   * 后面高优先级任务再执行
+   * 从而实现高优先级打断低优先级
+   */
+  if (existingCallbackNode !== null) {
+    console.log('cancelCallback');
+    Scheduler_cancelCallback(existingCallbackNode);
+  }
 
   if (newCallbackPriority === SyncLane) {
     //如果新的优先级是同步的话
@@ -158,6 +193,7 @@ function ensureRootIsScheduled(root) {
   }
   //在根节点记录当前执行的任务是newCallbackNode
   root.callbackNode = newCallbackNode;
+  root.callbackPriority = newCallbackPriority;
 }
 
 /**
@@ -182,7 +218,7 @@ function performSyncWorkOnRoot(root) {
  * @param root  根 FiberRootNode
  */
 function performConcurrentWorkOnRoot(root, didTimeout) {
-  console.log('performConcurrentWorkOnRoot', didTimeout);
+  console.log('performConcurrentWorkOnRoot__didTimeout', didTimeout);
   //先获取当前根节点上的任务
   const originalCallbackNode = root.callbackNode;
 
@@ -192,16 +228,13 @@ function performConcurrentWorkOnRoot(root, didTimeout) {
     return null;
   }
 
-  //如果不包含阻塞的车道，并且没有超时，就可以并行渲染,就是启用时间分片
-  //所以说默认更新车道是同步的,不能启用时间分片
+  /**
+   * 如果不包含阻塞的车道，并且任务没有超时，就可以并行渲染,就是启用时间分片
+   * 所以说默认更新车道是同步的,不能启用时间分片
+   * 当任务超时之后就不能使用时间分片，直接走同步渲染
+   */
   const shouldTimeSlice =
     !includesBlockingLane(root, lanes) && !didTimeout;
-  console.log(
-    'shouldTimeSlice',
-    shouldTimeSlice,
-    includesBlockingLane(root, lanes),
-    didTimeout
-  );
 
   /**
    * 执行渲染，得到退出的状态，也就是fiber树的构建状态，null or 进行中 or 完成
@@ -290,6 +323,7 @@ function renderRootSync(root, renderLanes) {
   }
   // 开启工作循环
   workLoopSync();
+  return RootCompleted;
 }
 
 /**
@@ -316,10 +350,10 @@ function workLoopConcurrent() {
     shouldYield是scheduler中用来判断时间切片是否过期的方法
    */
   while (workInProgress !== null && !shouldYield()) {
-    console.log('shouldYield()', shouldYield(), workInProgress);
     sleep(1000);
     performUnitOfWork(workInProgress);
   }
+  console.log('shouldYield', shouldYield())
 }
 
 /**
@@ -394,9 +428,6 @@ function completeUnitOfWork(unitOfWork) {
  * @description 执行卸载副作用 和 挂载副作用
  */
 function flushPassiveEffects() {
-  console.log(
-    '~~~~~~~~~~~下一个宏任务中flushPassiveEffect~~~~~~~~~~~'
-  );
   if (rootWithPendingPassiveEffects !== null) {
     const root = rootWithPendingPassiveEffects;
     //执行卸载副作用，destroy
@@ -429,8 +460,9 @@ function commitRootImpl(root) {
   //先获取新的构建好的fiber树的根fiber tag=3
   const { finishedWork } = root;
   workInProgressRoot = null;
-  workInProgressRootRenderLanes = null;
+  workInProgressRootRenderLanes = NoLanes;
   root.callbackNode = null;
+  root.callbackPriority = NoLane;
   if (
     (finishedWork.subtreeFlags & Passive) !== NoFlags ||
     (finishedWork.flags & Passive) !== NoFlags
@@ -461,6 +493,8 @@ function commitRootImpl(root) {
   }
   //等DOM变更后，就可以把让root的current指向新的fiber树
   root.current = finishedWork;
+  // root.pendingLanes = 16;
+  // ensureRootIsScheduled(root);
 }
 
 /**
@@ -487,61 +521,5 @@ function sleep(duration) {
     if (new Date().getTime() > endTime) {
       return;
     }
-  }
-}
-
-function printFinishedWork(fiber) {
-  const { flags, deletions } = fiber;
-  if ((flags & ChildDeletion) !== NoFlags) {
-    fiber.flags &= ~ChildDeletion;
-    console.log(
-      '子节点有删除' +
-        deletions
-          .map(fiber => `${fiber.type}#${fiber.memoizedProps.id}`)
-          .join(',')
-    );
-  }
-  let child = fiber.child;
-  while (child) {
-    printFinishedWork(child);
-    child = child.sibling;
-  }
-
-  if (fiber.flags !== NoFlags) {
-    console.log(
-      getFlags(fiber),
-      getTag(fiber.tag),
-      typeof fiber.type === 'function' ? fiber.type.name : fiber.type,
-      fiber.memoizedProps
-    );
-  }
-}
-function getFlags(fiber) {
-  const { flags } = fiber;
-  if (flags === (Placement | Update)) {
-    return '移动';
-  }
-  if (flags === Placement) {
-    return '插入';
-  }
-  if (flags === Update) {
-    return '更新';
-  }
-
-  return flags;
-}
-
-function getTag(tag) {
-  switch (tag) {
-    case FunctionComponent:
-      return 'FunctionComponent';
-    case HostRoot:
-      return 'HostRoot';
-    case HostComponent:
-      return 'HostComponent';
-    case HostText:
-      return 'HostText';
-    default:
-      return tag;
   }
 }

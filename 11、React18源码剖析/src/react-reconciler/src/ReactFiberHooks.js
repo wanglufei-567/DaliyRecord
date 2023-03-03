@@ -62,16 +62,25 @@ function mountReducer(reducer, initialArg) {
  * @param {*} action 派发的动作
  */
 function dispatchReducerAction(fiber, queue, action) {
+  // 获取当前的更新赛道
+  const lane = requestUpdateLane();
+
   //在每个hook里会存放一个更新队列
   //更新队列是一个更新对象的循环链表update1.next=update2.next=update1
   const update = {
     action, //{ type: 'add', payload: 1 } 派发的动作
     next: null //指向下一个更新对象
   };
+
   //把当前的最新的更添的添加更新队列中，并且返回当前的根fiber
-  const root = enqueueConcurrentHookUpdate(fiber, queue, update);
+  const root = enqueueConcurrentHookUpdate(
+    fiber,
+    queue,
+    update,
+    lane
+  );
   // 调度更新，重新渲染 需要注意这个是宏任务，所以多次dispatch会批量更新
-  scheduleUpdateOnFiber(root);
+  scheduleUpdateOnFiber(root, fiber, lane);
 }
 /* ----------------------------------------------------------------------- */
 
@@ -121,23 +130,28 @@ function dispatchSetState(fiber, queue, action) {
   };
   const alternate = fiber.alternate;
 
-  if (
-    fiber.lanes === NoLanes &&
-    (alternate === null || alternate.lanes == NoLanes)
-  ) {
-    //先获取队列上的老的状态和老的reducer
-    const { lastRenderedReducer, lastRenderedState } = queue;
-    //使用上次的状态和上次的reducer结合本次action进行计算新状态
-    const eagerState = lastRenderedReducer(lastRenderedState, action);
-    update.hasEagerState = true;
-    update.eagerState = eagerState;
-    //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
-    if (Object.is(eagerState, lastRenderedState)) {
-      return;
-    }
-  }
+  // if (
+  //   fiber.lanes === NoLanes &&
+  //   (alternate === null || alternate.lanes == NoLanes)
+  // ) {
+  //   //先获取队列上的老的状态和老的reducer
+  //   const { lastRenderedReducer, lastRenderedState } = queue;
+  //   //使用上次的状态和上次的reducer结合本次action进行计算新状态
+  //   const eagerState = lastRenderedReducer(lastRenderedState, action);
+  //   update.hasEagerState = true;
+  //   update.eagerState = eagerState;
+  //   //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
+  //   if (Object.is(eagerState, lastRenderedState)) {
+  //     return;
+  //   }
+  // }
   //下面是真正的入队更新，并调度更新逻辑
-  const root = enqueueConcurrentHookUpdate(fiber, queue, update, lane);
+  const root = enqueueConcurrentHookUpdate(
+    fiber,
+    queue,
+    update,
+    lane
+  );
   scheduleUpdateOnFiber(root, fiber, lane);
 }
 

@@ -1,6 +1,6 @@
 import { createHostRootFiber } from './ReactFiber';
 import { initialUpdateQueue } from './ReactFiberClassUpdateQueue';
-import { NoLanes } from './ReactFiberLane';
+import { NoLanes, NoLane } from './ReactFiberLane';
 
 /**
  * @description FiberRootNode的构造函数，用于创建fiber根节点
@@ -15,6 +15,12 @@ function FiberRootNode(containerInfo) {
 
   //表示此根上有哪些赛道等待被处理
   this.pendingLanes = NoLanes;
+
+  // 表示此根上的调度优先级
+  this.callbackPriority = NoLane;
+
+  // 表示当前根上执行任务
+  this.callbackNode = null;
 }
 
 /**

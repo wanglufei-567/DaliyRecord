@@ -203,6 +203,14 @@ function performWorkUntilDeadline() {
   }
 }
 
+/**
+ * @description 取消当前任务
+ * 将task.callback置为null之后，在workLoop会将该任务弹出pop(taskQueue);
+ */
+function unstable_cancelCallback(task) {
+  task.callback = null;
+}
+
 export {
   scheduleCallback as unstable_scheduleCallback,
   shouldYieldToHost as unstable_shouldYield,
@@ -210,7 +218,8 @@ export {
   UserBlockingPriority as unstable_UserBlockingPriority,
   NormalPriority as unstable_NormalPriority,
   LowPriority as unstable_LowPriority,
-  IdlePriority as unstable_IdlePriority
+  IdlePriority as unstable_IdlePriority,
+  unstable_cancelCallback
 };
 
 /*
