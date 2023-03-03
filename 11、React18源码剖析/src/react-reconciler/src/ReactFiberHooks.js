@@ -90,7 +90,7 @@ function dispatchReducerAction(fiber, queue, action) {
  */
 function mountState(initialState) {
   const hook = mountWorkInProgressHook();
-  hook.memoizedState = initialState;
+  hook.memoizedState = hook.baseState = initialState;
   const queue = {
     pending: null,
     dispatch: null,
@@ -130,21 +130,25 @@ function dispatchSetState(fiber, queue, action) {
   };
   const alternate = fiber.alternate;
 
-  // if (
-  //   fiber.lanes === NoLanes &&
-  //   (alternate === null || alternate.lanes == NoLanes)
-  // ) {
-  //   //先获取队列上的老的状态和老的reducer
-  //   const { lastRenderedReducer, lastRenderedState } = queue;
-  //   //使用上次的状态和上次的reducer结合本次action进行计算新状态
-  //   const eagerState = lastRenderedReducer(lastRenderedState, action);
-  //   update.hasEagerState = true;
-  //   update.eagerState = eagerState;
-  //   //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
-  //   if (Object.is(eagerState, lastRenderedState)) {
-  //     return;
-  //   }
-  // }
+  /**
+   * 当派发动作后，立刻用上一次的状态和上一次的reducer计算新状态
+   * 只有第一个更新都能进行此项优化
+   */
+  if (
+    fiber.lanes === NoLanes &&
+    (alternate === null || alternate.lanes == NoLanes)
+  ) {
+    //先获取队列上的老的状态和老的reducer
+    const { lastRenderedReducer, lastRenderedState } = queue;
+    //使用上次的状态和上次的reducer结合本次action进行计算新状态
+    const eagerState = lastRenderedReducer(lastRenderedState, action);
+    update.hasEagerState = true;
+    update.eagerState = eagerState;
+    //若本次更新的状态eagerState和上次的状态lastRenderedState一样的，则直接退出不进行更新操作
+    if (Object.is(eagerState, lastRenderedState)) {
+      return;
+    }
+  }
   //下面是真正的入队更新，并调度更新逻辑
   const root = enqueueConcurrentHookUpdate(
     fiber,
@@ -318,13 +322,17 @@ function updateReducer(reducer) {
       update = update.next;
     } while (update !== null && update !== firstUpdate);
   }
-  // 将新状态添加到hook上，并返回给组件使用
-  hook.memoizedState = newState;
+
+  /**
+   * 将新状态添加到hook上，并返回给组件使用
+   * 计算好新的状态后，不但要改变hook的状态，也要改变hook上队列的lastRenderedState
+   */
+  hook.memoizedState = queue.lastRenderedState = newState;
   return [hook.memoizedState, queue.dispatch];
 }
 
-function updateState() {
-  return updateReducer(baseStateReducer);
+function updateState(initialState) {
+  return updateReducer(baseStateReducer, initialState);
 }
 
 /**

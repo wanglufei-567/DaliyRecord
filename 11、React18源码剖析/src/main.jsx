@@ -1,25 +1,16 @@
 import * as React from 'react';
-import { createRoot } from 'react-dom/client';
-
+import { createRoot } from "react-dom/client";
 function FunctionComponent() {
-  const [numbers, setNumbers] = React.useState(
-    new Array(10).fill('A')
-  );
-  React.useEffect(() => {
-    setNumbers(numbers => numbers.map(number => number + 'B'));
-  }, []);
+  console.log('FunctionComponent');
+  const [number, setNumber] = React.useState(0);
   return (
-    <button
-      onClick={() =>
-        setNumbers(numbers => numbers.map(number => number + 'C'))
-      }
-    >
-      {numbers.map((number, index) => (
-        <span key={index}>{number}</span>
-      ))}
+    <button onClick={() => {
+      setNumber((number) => number)
+    }}>
+      {number}
     </button>
-  );
+  )
 }
-let element = <FunctionComponent />;
-const root = createRoot(document.getElementById('root'));
+let element = <FunctionComponent />
+const root = createRoot(document.getElementById("root"));
 root.render(element);
