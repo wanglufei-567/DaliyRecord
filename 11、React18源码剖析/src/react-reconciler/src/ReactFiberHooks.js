@@ -28,9 +28,86 @@ const HooksDispatcherOnMount = {
   useReducer: mountReducer,
   useState: mountState,
   useEffect: mountEffect,
-  useLayoutEffect: mountLayoutEffect
+  useLayoutEffect: mountLayoutEffect,
+  useRef: mountRef
 };
 
+const HooksDispatcherOnUpdate = {
+  useReducer: updateReducer,
+  useState: updateState,
+  useEffect: updateEffect,
+  useLayoutEffect: updateLayoutEffect,
+  useRef: updateRef
+};
+
+/**
+ * @description 挂载构建中的hook
+ * hook是个对象
+ */
+function mountWorkInProgressHook() {
+  const hook = {
+    memoizedState: null, //hook的状态 0
+    queue: null, //存放本hook的更新队列 queue.pending=update的循环链表
+    next: null //指向下一个hook,一个函数里可以会有多个hook,它们会组成一个单向链表
+  };
+  if (workInProgressHook === null) {
+    //当前函数对应的fiber的状态等于第一个hook对象
+    currentlyRenderingFiber.memoizedState = workInProgressHook = hook;
+  } else {
+    workInProgressHook = workInProgressHook.next = hook;
+  }
+  return workInProgressHook;
+}
+
+/**
+ * @description 构建新的hooks
+ */
+function updateWorkInProgressHook() {
+  //获取将要构建的新的hook的老hook
+  if (currentHook === null) {
+    // 获取老fiber
+    const current = currentlyRenderingFiber.alternate;
+    //获取老hook
+    currentHook = current.memoizedState;
+  } else {
+    currentHook = currentHook.next;
+  }
+  //根据老hook创建新hook
+  const newHook = {
+    memoizedState: currentHook.memoizedState,
+    queue: currentHook.queue,
+    next: null
+  };
+
+  if (workInProgressHook === null) {
+    // 新fiber的memoizedState挂上新hook
+    currentlyRenderingFiber.memoizedState = workInProgressHook =
+      newHook;
+  } else {
+    workInProgressHook = workInProgressHook.next = newHook;
+  }
+  return workInProgressHook;
+}
+
+/* -------------------------useRef-start------------------------------ */
+
+function mountRef(initialValue) {
+  const hook = mountWorkInProgressHook();
+  const ref = {
+    current: initialValue
+  }
+  // useRef的hook对象上的memoizedState是ref对象
+  hook.memoizedState = ref;
+  return ref;
+}
+
+function updateRef() {
+  const hook = updateWorkInProgressHook();
+  return hook.memoizedState;
+}
+/* -------------------------useRef-end------------------------------ */
+
+/* -------------------------useReducer-start------------------------------ */
 /**
  * @description 挂载Reducer这个hook
  * @param reducer 用户创建的reducer方法，useReducer(reducer, initialArg)
@@ -82,7 +159,48 @@ function dispatchReducerAction(fiber, queue, action) {
   // 调度更新，重新渲染 需要注意这个是宏任务，所以多次dispatch会批量更新
   scheduleUpdateOnFiber(root, fiber, lane);
 }
-/* ----------------------------------------------------------------------- */
+
+function updateReducer(reducer) {
+  //获取新的hook
+  const hook = updateWorkInProgressHook();
+  //获取新的hook的更新队列
+  const queue = hook.queue;
+  //获取老的hook
+  const current = currentHook;
+  //获取将要生效的更新队列
+  const pendingQueue = queue.pending;
+  //初始化一个新的状态，取值为当前的状态
+  let newState = current.memoizedState;
+
+  // 处理hook上的更新队列
+  if (pendingQueue !== null) {
+    // 断开pending
+    queue.pending = null;
+    // 获取更新队列上第一个更新对象
+    const firstUpdate = pendingQueue.next;
+    let update = firstUpdate;
+    // 使用用户自定义的reducer计算新状态
+    do {
+      if (update.hasEagerState) {
+        newState = update.eagerState;
+      } else {
+        const action = update.action;
+        newState = reducer(newState, action);
+      }
+      update = update.next;
+    } while (update !== null && update !== firstUpdate);
+  }
+
+  /**
+   * 将新状态添加到hook上，并返回给组件使用
+   * 计算好新的状态后，不但要改变hook的状态，也要改变hook上队列的lastRenderedState
+   */
+  hook.memoizedState = queue.lastRenderedState = newState;
+  return [hook.memoizedState, queue.dispatch];
+}
+/* -------------------------useReducer-end------------------------------ */
+
+/* -------------------------useState-start------------------------------ */
 
 /**
  * @description 挂载useState
@@ -131,8 +249,16 @@ function dispatchSetState(fiber, queue, action) {
   const alternate = fiber.alternate;
 
   /**
+   * eager 急切的
    * 当派发动作后，立刻用上一次的状态和上一次的reducer计算新状态
-   * 只有第一个更新都能进行此项优化
+   * 在dispatch时就开始计算，不用等到scheduleUpdateOnFiber调度更新后，
+   * 再执行当前函数组件时在updateState中计算
+   * 这么做的好处有两点
+   * 1、若是新旧状态一致，便不用调度更新
+   * 2、在dispatch时就计算好，调度更新时直接使用即可，减少更新时的计算时间
+   * 主要注意⚠️的是：只有第一个dispatch更新都能进行此项优化，
+   * 这是因为updateState检查hasEagerState为true后，会直接使用eagerState作为新状态
+   * 若是多次更新都走eagerState的逻辑，会导致只有最后一个更新生效
    */
   if (
     fiber.lanes === NoLanes &&
@@ -159,7 +285,12 @@ function dispatchSetState(fiber, queue, action) {
   scheduleUpdateOnFiber(root, fiber, lane);
 }
 
-/* ----------------------------------------------------------------------- */
+function updateState(initialState) {
+  return updateReducer(baseStateReducer, initialState);
+}
+/* -------------------------useState-end------------------------------ */
+
+/* -------------------------useEffect-start------------------------------ */
 
 /**
  * @param create 副作用函数
@@ -237,105 +368,6 @@ function createFunctionComponentUpdateQueue() {
 }
 
 /**
- * @description 挂载构建中的hook
- * hook是个对象
- */
-function mountWorkInProgressHook() {
-  const hook = {
-    memoizedState: null, //hook的状态 0
-    queue: null, //存放本hook的更新队列 queue.pending=update的循环链表
-    next: null //指向下一个hook,一个函数里可以会有多个hook,它们会组成一个单向链表
-  };
-  if (workInProgressHook === null) {
-    //当前函数对应的fiber的状态等于第一个hook对象
-    currentlyRenderingFiber.memoizedState = workInProgressHook = hook;
-  } else {
-    workInProgressHook = workInProgressHook.next = hook;
-  }
-  return workInProgressHook;
-}
-
-const HooksDispatcherOnUpdate = {
-  useReducer: updateReducer,
-  useState: updateState,
-  useEffect: updateEffect,
-  useLayoutEffect: updateLayoutEffect
-};
-
-/**
- * @description 构建新的hooks
- */
-function updateWorkInProgressHook() {
-  //获取将要构建的新的hook的老hook
-  if (currentHook === null) {
-    // 获取老fiber
-    const current = currentlyRenderingFiber.alternate;
-    //获取老hook
-    currentHook = current.memoizedState;
-  } else {
-    currentHook = currentHook.next;
-  }
-  //根据老hook创建新hook
-  const newHook = {
-    memoizedState: currentHook.memoizedState,
-    queue: currentHook.queue,
-    next: null
-  };
-
-  if (workInProgressHook === null) {
-    // 新fiber的memoizedState挂上新hook
-    currentlyRenderingFiber.memoizedState = workInProgressHook =
-      newHook;
-  } else {
-    workInProgressHook = workInProgressHook.next = newHook;
-  }
-  return workInProgressHook;
-}
-
-function updateReducer(reducer) {
-  //获取新的hook
-  const hook = updateWorkInProgressHook();
-  //获取新的hook的更新队列
-  const queue = hook.queue;
-  //获取老的hook
-  const current = currentHook;
-  //获取将要生效的更新队列
-  const pendingQueue = queue.pending;
-  //初始化一个新的状态，取值为当前的状态
-  let newState = current.memoizedState;
-
-  // 处理hook上的更新队列
-  if (pendingQueue !== null) {
-    // 断开pending
-    queue.pending = null;
-    // 获取更新队列上第一个更新对象
-    const firstUpdate = pendingQueue.next;
-    let update = firstUpdate;
-    // 使用用户自定义的reducer计算新状态
-    do {
-      if (update.hasEagerState) {
-        newState = update.eagerState;
-      } else {
-        const action = update.action;
-        newState = reducer(newState, action);
-      }
-      update = update.next;
-    } while (update !== null && update !== firstUpdate);
-  }
-
-  /**
-   * 将新状态添加到hook上，并返回给组件使用
-   * 计算好新的状态后，不但要改变hook的状态，也要改变hook上队列的lastRenderedState
-   */
-  hook.memoizedState = queue.lastRenderedState = newState;
-  return [hook.memoizedState, queue.dispatch];
-}
-
-function updateState(initialState) {
-  return updateReducer(baseStateReducer, initialState);
-}
-
-/**
  * @description 更新时的useEffect
  * @param create 副作用函数
  * @param deps 依赖数组
@@ -401,6 +433,7 @@ function areHookInputsEqual(nextDeps, prevDeps) {
   }
   return true;
 }
+/* -------------------------useEffect-end------------------------------ */
 
 /**
  * 渲染函数组件

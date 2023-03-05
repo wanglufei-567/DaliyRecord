@@ -50,6 +50,7 @@ export function FiberNode(tag, pendingProps, key) {
   this.index = 0;
 
   this.deletions = null;
+  this.ref = null;
   // fiber上的车道，默认值是NoLanes
   this.lanes = NoLanes;
 }
@@ -98,6 +99,7 @@ export function createWorkInProgress(current, pendingProps) {
   workInProgress.updateQueue = current.updateQueue;
   workInProgress.sibling = current.sibling;
   workInProgress.index = current.index;
+  workInProgress.ref = current.ref;
   return workInProgress;
 }
 

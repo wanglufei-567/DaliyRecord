@@ -6,13 +6,17 @@ import {
   finalizeInitialChildren,
   prepareUpdate
 } from 'react-dom-bindings/src/client/ReactDOMHostConfig';
-import { NoFlags, Update } from './ReactFiberFlags';
+import { NoFlags, Update, Ref } from './ReactFiberFlags';
 import {
   HostComponent,
   HostRoot,
   HostText,
   FunctionComponent
 } from './ReactWorkTags';
+
+function markRef(workInProgress) {
+  workInProgress.flags |= Ref;
+}
 
 /**
  * 把当前的完成的fiber所有的子节点对应的真实DOM都挂载到自己父parent真实DOM节点上
@@ -124,6 +128,10 @@ export function completeWork(current, workInProgress) {
       if (current !== null && workInProgress.stateNode !== null) {
         //如果老fiber存在，并且老fiber上有真实DOM节点，要走节点更新的逻辑
         updateHostComponent(current, workInProgress, type, newProps);
+        // 如果新fiber上的ref和老fiber上的ref不相等，则标记ref
+        if (current.ref !== workInProgress.ref !== null) {
+          markRef(workInProgress);
+        }
       } else {
         //创建或者说挂载新节点的情况
 
@@ -139,6 +147,10 @@ export function completeWork(current, workInProgress) {
         workInProgress.stateNode = instance;
         // 完成真实DOM的构建
         finalizeInitialChildren(instance, type, newProps);
+        // 挂载新新节点时，若fiber上有ref，则标记ref
+        if (workInProgress.ref !== null) {
+          markRef(workInProgress);
+        }
       }
       //向上冒泡属性
       bubbleProperties(workInProgress);

@@ -218,7 +218,7 @@ function performSyncWorkOnRoot(root) {
  * @param root  根 FiberRootNode
  */
 function performConcurrentWorkOnRoot(root, didTimeout) {
-  console.log('performConcurrentWorkOnRoot__didTimeout', didTimeout);
+  // console.log('performConcurrentWorkOnRoot__didTimeout', didTimeout);
   //先获取当前根节点上的任务
   const originalCallbackNode = root.callbackNode;
 
@@ -350,10 +350,10 @@ function workLoopConcurrent() {
     shouldYield是scheduler中用来判断时间切片是否过期的方法
    */
   while (workInProgress !== null && !shouldYield()) {
-    sleep(1000);
+    // sleep(1000);
     performUnitOfWork(workInProgress);
   }
-  console.log('shouldYield', shouldYield())
+  // console.log('shouldYield', shouldYield())
 }
 
 /**

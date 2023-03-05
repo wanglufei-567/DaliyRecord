@@ -5,4 +5,5 @@ export {
   useReducer,
   useEffect,
   useLayoutEffect,
+  useRef,
 } from './src/React';

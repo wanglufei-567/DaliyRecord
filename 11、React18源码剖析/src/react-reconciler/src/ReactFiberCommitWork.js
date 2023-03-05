@@ -9,7 +9,8 @@ import {
   MutationMask,
   Update,
   Passive,
-  LayoutMask
+  LayoutMask,
+  Ref
 } from './ReactFiberFlags';
 import {
   FunctionComponent,
@@ -283,6 +284,10 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
       recursivelyTraverseMutationEffects(root, finishedWork);
       //再处理自己身上的副作用
       commitReconciliationEffects(finishedWork);
+      // 提交附加的ref，给ref绑定真实DOM节点
+      if (flags & Ref) {
+        commitAttachRef(finishedWork);
+      }
       //处理DOM更新
       if (flags & Update) {
         //获取真实DOM
@@ -313,6 +318,18 @@ export function commitMutationEffectsOnFiber(finishedWork, root) {
     }
     default:
       break;
+  }
+}
+
+function commitAttachRef(finishedWork) {
+  const ref = finishedWork.ref;
+  if (ref !== null) {
+    const instance = finishedWork.stateNode;
+    if (typeof ref === 'function') {
+      ref(instance);
+    } else {
+      ref.current = instance;
+    }
   }
 }
 
