@@ -5,7 +5,8 @@ import {
 } from './ReactFiberClassUpdateQueue';
 import {
   scheduleUpdateOnFiber,
-  requestUpdateLane
+  requestUpdateLane,
+  requestEventTime
 } from './ReactFiberWorkLoop';
 
 /**
@@ -31,6 +32,9 @@ export function updateContainer(element, container) {
   //请求一个更新车道 初次渲染时是默认事件车道 DefaultLane 16
   const lane = requestUpdateLane(current);
 
+  //请求当前事件发生的时间，用于后续给lanes计算过期时间
+  const eventTime = requestEventTime();
+
   //创建更新对象
   const update = createUpdate(lane);
 
@@ -41,5 +45,5 @@ export function updateContainer(element, container) {
   const root = enqueueUpdate(current, update, lane);
 
   // 在fiber上调度更新
-  scheduleUpdateOnFiber(root, current, lane);
+  scheduleUpdateOnFiber(root, current, lane, eventTime);
 }

@@ -13,6 +13,7 @@ import {
 } from './ReactChildFiber';
 import { shouldSetTextContent } from 'react-dom-bindings/src/client/ReactDOMHostConfig.js';
 import { renderWithHooks } from 'react-reconciler/src/ReactFiberHooks';
+import { NoLane, NoLanes } from './ReactFiberLane';
 
 /**
  * @description 协调子fiber 根据新的虚拟DOM生成新的Fiber链表
@@ -124,13 +125,15 @@ export function updateFunctionComponent(
   current,
   workInProgress,
   Component,
-  nextProps
+  nextProps,
+  renderLanes
 ) {
   const nextChildren = renderWithHooks(
     current,
     workInProgress,
     Component,
-    nextProps
+    nextProps,
+    renderLanes
   );
   reconcileChildren(current, workInProgress, nextChildren);
   return workInProgress.child;
@@ -145,6 +148,22 @@ export function beginWork(current, workInProgress, renderLanes) {
   // 打印workInProgress
   // logger(' '.repeat(indent.number) + 'beginWork', workInProgress);
   // indent.number += 2;
+
+  //在构建fiber树之后清空lanes
+  /**
+   * ‼️重要
+   * 在处理当前fiber节点之前，将其fiber的lanes重置为NoLanes
+   * 为何要重置？
+   * 这是因为一个fiber上的所有lane可能无法一次更新完成
+   * 会优先完成renderLanes对应的lane，优先完成的lane便需要被去除
+   * 如何去除？直接重置为NoLanes，然后再重新合并计算
+   * fiber上新的lanes会由被剩下的所有更新对象update中的lane合并生成
+   *
+   * ⚠️注意 需要区分renderLanes 和fiber.lanes
+   * renderLanes是root.pendingLanes中优先级最高的lane
+   * fiber.lanes是由fiber上所有更新对象update中的lane合并生成
+   */
+  workInProgress.lanes = NoLanes;
 
   switch (workInProgress.tag) {
     case IndeterminateComponent:

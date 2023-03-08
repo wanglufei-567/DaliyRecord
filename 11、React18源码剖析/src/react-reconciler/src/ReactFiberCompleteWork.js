@@ -13,6 +13,7 @@ import {
   HostText,
   FunctionComponent
 } from './ReactWorkTags';
+import { NoLanes, mergeLanes } from './ReactFiberLane';
 
 function markRef(workInProgress) {
   workInProgress.flags |= Ref;
@@ -57,14 +58,19 @@ function appendAllChildren(parent, workInProgress) {
  * @param completedWork 已完成的fiber
  */
 function bubbleProperties(completedWork) {
+  let newChildLanes = NoLanes;
   let subtreeFlags = NoFlags;
   //遍历当前fiber的所有子节点，把所有的子节的副作用，以及子节点的子节点的副作用全部合并
   let child = completedWork.child;
   while (child !== null) {
+    // 向上冒泡lanes,所有子fiber的lanes最终会冒泡到HostRootFiber上
+    newChildLanes = mergeLanes(newChildLanes, mergeLanes(child.lanes, child.childLanes));
+
     subtreeFlags |= child.subtreeFlags;
     subtreeFlags |= child.flags;
     child = child.sibling;
   }
+  completedWork.childLanes = newChildLanes;
   completedWork.subtreeFlags = subtreeFlags;
 }
 

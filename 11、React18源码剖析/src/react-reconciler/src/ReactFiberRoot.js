@@ -1,6 +1,6 @@
 import { createHostRootFiber } from './ReactFiber';
 import { initialUpdateQueue } from './ReactFiberClassUpdateQueue';
-import { NoLanes, NoLane } from './ReactFiberLane';
+import { NoLanes, NoLane, createLaneMap, NoTimestamp } from './ReactFiberLane';
 
 /**
  * @description FiberRootNode的构造函数，用于创建fiber根节点
@@ -21,6 +21,12 @@ function FiberRootNode(containerInfo) {
 
   // 表示当前根上执行任务
   this.callbackNode = null;
+
+   //过期时间 存放每个赛道过期时间
+   this.expirationTimes = createLaneMap(NoTimestamp);
+
+   //过期的赛道
+   this.expiredLanes = NoLanes;
 }
 
 /**
