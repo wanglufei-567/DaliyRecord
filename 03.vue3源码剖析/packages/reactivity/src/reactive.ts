@@ -12,9 +12,12 @@ function createReactiveObject(target: object, isReadonly: boolean) {
 
   /**
    * 在进行对象代理前先进行取值，看是否已经是代理对象了
-   * 若不是代理对象则target[ReactiveFlags.IS_REACTIVE]为undefined
-   * 若是已经代理过的对象，则会走到mutableHandlers.get()中，返回值为true
+   * 若是已经代理过的对象，则target[ReactiveFlags.IS_REACTIVE]
+   * 会走到getter方法，也就是mutableHandlers.get()中，
+   * mutableHandlers.get()的返回值为true
    * 即target[ReactiveFlags.IS_REACTIVE]===true表示target已经被代理过了
+   *
+   * 若不是代理对象则target[ReactiveFlags.IS_REACTIVE]为undefined
    */
   if (target[ReactiveFlags.IS_REACTIVE]) {
     return target;

@@ -39,10 +39,15 @@ class ComputedRefImpl {
   private __v_isRef = true; // 用于标识是否是ref
   constructor(getter, public setter) {
 
-    // effect.deps 存的是属性对应的set集合
+    /**
+     * 实例化一个effect
+     * 在getter中使用响应式数据attr时，此effect会被收集到targetMap上
+     * 当响应式数据attr发生变化时，此effect便会被触发更新
+     * 最终走到第二个参数scheduler中
+     */
     this.effect = new ReactiveEffect(getter, () => {
       /**
-       * effect 的 scheduler，
+       * 此effect的scheduler
        * 这里自定义 当前计算属性依赖的 attr 发生变化后的更新逻辑
        */
       if (!this._dirty) {
@@ -60,10 +65,11 @@ class ComputedRefImpl {
 
   get value() {
     /**
-     * 有effect依赖当前计算属性的话，就将其收集到当前计算属性的deps中
+     * 有effect依赖当前计算属性的话，就将其收集到 当前计算属性 的deps中
+     *
      * 注意：只有当effect的副作用函数执行时，activeEffect才有值，
      * 若是当前计算属性value在被使用时，activeEffect有值的话
-     * 就说明了此activeEffect时依赖当前计算属性的
+     * 就说明了此activeEffect是依赖当前计算属性的
      */
     if (activeEffect) {
       trackEffects(this.deps || (this.deps = new Set()));

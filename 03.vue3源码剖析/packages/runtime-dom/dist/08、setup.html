@@ -46,6 +46,10 @@
     const VueComponent = {
       setup() {
         const { state, handleClick } = useCount()
+        /**
+         * 若setup返回值是对象，则将该对象挂在组件实例上
+         * 并对该对象进行代理，若是ref则自动.value取值
+         */
         return {
           ...toRefs(state),
           handleClick
