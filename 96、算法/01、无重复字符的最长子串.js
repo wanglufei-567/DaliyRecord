@@ -31,3 +31,6 @@ var lengthOfLongestSubstring = function(s) {
   }
   return max
 };
+
+const str = '123'.split('')
+console.log('str', Array.isArray(str))
