@@ -1,51 +1,71 @@
-const p1 = new Promise(res => {
-  setTimeout(() => {
-    res('p1');
-  });
-});
+const fs = require('fs/promises');
+const path = require('path');
 
-const p2 = data =>
-  new Promise(res => {
-    setTimeout(() => {
-      res(data);
-    });
-  });
+const readA = () =>
+  fs.readFile(path.resolve(__dirname, 'a.txt'), 'utf8');
 
-function* gen() {
-  const data = yield p1;
-  const result = yield p2(data);
-  return result;
-}
+const readB = data1 =>
+  fs.readFile(path.resolve(__dirname, data1), 'utf8');
 
-const it = gen();
-
-// 原理
-let { value } = it.next();
-value.then(data => {
-  let { value } = it.next(data);
-  value.then(result => {
-    it.next(result);
-  });
-});
-
-// 封装一下
-function co(it) {
-  return new Promise((resolve, reject) => {
-      function next(data) {
-          let { value, done } = it.next(data);
-          if (done) {
-              return resolve(value);
-          }
-          Promise.resolve(value).then(data => {
-              next(data)
-          }, reject)
-      }
-      next();
+/**
+ * 链式操作
+ */
+readA()
+  .then(data => {
+    console.log('ReadA', data);
+    return readB(data);
   })
+  .then(data => console.log('readB', data));
+
+
+/**
+ * 使用Generator的写法
+ */
+function* readFile() {
+  let data1 = yield readA();
+  let data2 = yield readB(data1);
+  return data2; // 30
 }
 
-co(gen()).then(result => {
-  console.log(result)
+let it = readFile();
+let {value,done} = it.next();
+value.then(data1=>{
+    let {value,done} = it.next(data1)
+    value.then(data2=>{
+        let {value,done} = it.next(data2);
+        console.log(value)
+    })
 })
 
-// async ...await 其实就是co + generator
+/**
+ * 将next的执行封装成递归方法co
+ * 使用co + Generator的写法
+ */
+function co(it) {
+  return new Promise((resolve, reject) => {
+    function step(data) {
+      let { value, done } = it.next(data);
+      if (!done) {
+        Promise.resolve(value)
+          .then(data => {
+            // 第一步完成
+            step(data); // 下一步
+          })
+          .catch(e => {
+            reject(e);
+          });
+      } else {
+        resolve(value);
+      }
+    }
+    step();
+  });
+}
+
+co(readFile())
+  .then(data => {
+    console.log(data);
+  })
+  .catch(e => {
+    console.log(e);
+  });
