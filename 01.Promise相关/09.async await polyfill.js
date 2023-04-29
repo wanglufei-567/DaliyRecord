@@ -1,3 +1,9 @@
+// async function read() {
+//   const a = await 1;
+//   const b = await 2;
+//   const c = await 3;
+// }
+
 'use strict';
 
 function asyncGeneratorStep(
@@ -56,21 +62,35 @@ function _asyncToGenerator(fn) {
   };
 }
 
-function a() {
-  return _a.apply(this, arguments);
+function read() {
+  return _read.apply(this, arguments);
 }
 
-function _a() {
-  _a = _asyncToGenerator(
+function _read() {
+  _read = _asyncToGenerator(
     /*#__PURE__*/ regeneratorRuntime.mark(function _callee() {
+      var a, b, c;
       return regeneratorRuntime.wrap(function _callee$(_context) {
         while (1) {
           switch ((_context.prev = _context.next)) {
             case 0:
               _context.next = 2;
-              return Promise.resolve(11);
+              return 1;
 
             case 2:
+              a = _context.sent;
+              _context.next = 5;
+              return 2;
+
+            case 5:
+              b = _context.sent;
+              _context.next = 8;
+              return 3;
+
+            case 8:
+              c = _context.sent;
+
+            case 9:
             case 'end':
               return _context.stop();
           }
@@ -78,5 +98,5 @@ function _a() {
       }, _callee);
     })
   );
-  return _a.apply(this, arguments);
+  return _read.apply(this, arguments);
 }
