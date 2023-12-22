@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 // 读取Excel文件
-const workbook = XLSX.readFile(path.join(__dirname, 'input.xlsx'))
+const workbook = XLSX.readFile(path.join(__dirname, '../input/input.xlsx'))
 const worksheet = workbook.Sheets[workbook.SheetNames[0]]
 
 // 将工作表转换为JSON数组
@@ -29,4 +29,4 @@ data.forEach((row) => {
 })
 
 // 遍历结果对象，将每个属性的值写入一个JSON文件
-Reflect.ownKeys(result).forEach((key) => fs.writeFileSync(path.join(__dirname, 'assets', `${key}.json`), JSON.stringify(result[key], null, 2)))
+Reflect.ownKeys(result).forEach((key) => fs.writeFileSync(path.join(__dirname, '../output', `${key}.json`), JSON.stringify(result[key], null, 2)))
