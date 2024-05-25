@@ -10,15 +10,16 @@ const baseDir = normalizePath(process.cwd());
 function normalizePath(path) {
   return path.replace(/\\/g, '/');
 }
+
 class Compilation {
   constructor(options, compiler) {
     this.options = options;
     this.compiler = compiler;
-    this.modules = []; //这里放置本次编译涉及的所有的模块
-    this.chunks = []; //本次编译所组装出的代码块
-    this.assets = {}; //key是文件名,值是文件内容
-    this.files = []; //代表本次打包出来的文件
-    this.fileDependencies = new Set(); //本次编译依赖的文件或者说模块
+    this.modules = []; // 这里放置本次编译涉及的所有的依赖模块
+    this.chunks = []; // 本次编译所组装出的代码块
+    this.assets = {}; // key是文件名,值是文件内容
+    this.files = []; // 代表本次打包出来的文件
+    this.fileDependencies = new Set(); // 本次编译依赖的文件或者说模块
   }
 
   build(callback) {
@@ -34,6 +35,8 @@ class Compilation {
     for (let entryName in entry) {
       //处理入口文件的文件路径
       let entryFilePath = path.posix.join(baseDir, entry[entryName]);
+
+      // 将入口文件的路径添加进维护所有依赖模块的 Set 中
       this.fileDependencies.add(entryFilePath);
 
       //6.从入口文件出发,调用所有配置的Loader对模块进行编译
@@ -80,13 +83,13 @@ class Compilation {
 
   /**
    * @description 编译模块，调用loader转换源码就是在这里做的
-   * @param {*} name 模块所属的代码块(chunk)的名称
-   * 也就是entry的name entry1 entry2
+   * @param {*} name 模块所属的代码块(chunk)的名称，也就是entry的name entry1 entry2
    * @param {*} modulePath 模块的路径
    */
   buildModule(name, modulePath) {
     //1.读取文件的内容，得到源码
     let sourceCode = fs.readFileSync(modulePath, 'utf8');
+
     let { rules } = this.options.module;
 
     //根据规则找到所有的匹配的loader
@@ -147,7 +150,9 @@ class Compilation {
             depModulePath = require.resolve(depModuleName);
           }
 
+          // 把依赖模块的路径放到维护所有依赖模块的 Set 中
           this.fileDependencies.add(depModulePath);
+
           //获取依赖的模块的ID,修改语法树，把依赖的模块名换成模块ID
           let depModuleId =
             './' + path.posix.relative(baseDir, depModulePath);
@@ -164,6 +169,7 @@ class Compilation {
 
     //使用改造后的ast语法要地重新生成新的源代码
     let { code } = generator(ast);
+    console.log('after ast transform', code);
 
     //将新的源代码添加到module上
     module._source = code;

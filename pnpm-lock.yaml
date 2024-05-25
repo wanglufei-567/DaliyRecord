@@ -245,6 +245,9 @@ importers:
       '@babel/types':
         specifier: ^7.18.10
         version: 7.18.10
+      tapable:
+        specifier: ^2.2.1
+        version: 2.2.1
       webpack:
         specifier: ^5.74.0
         version: 5.76.0(webpack-cli@4.10.0)
@@ -2283,7 +2286,7 @@ packages:
       webpack-cli: 4.x.x
     dependencies:
       webpack: 5.76.0(webpack-cli@4.10.0)
-      webpack-cli: 4.10.0(webpack-dev-server@4.11.1)(webpack@5.76.0)
+      webpack-cli: 4.10.0(webpack@5.76.0)
     dev: true
 
   /@webpack-cli/configtest@2.1.1(webpack-cli@5.0.1)(webpack@5.76.0):
@@ -2303,7 +2306,7 @@ packages:
       webpack-cli: 4.x.x
     dependencies:
       envinfo: 7.13.0
-      webpack-cli: 4.10.0(webpack-dev-server@4.11.1)(webpack@5.76.0)
+      webpack-cli: 4.10.0(webpack@5.76.0)
     dev: true
 
   /@webpack-cli/info@2.0.2(webpack-cli@5.0.1)(webpack@5.76.0):
@@ -7575,7 +7578,7 @@ packages:
       schema-utils: 3.3.0
       serialize-javascript: 6.0.2
       terser: 5.31.0
-      webpack: 5.76.0(webpack-cli@5.0.1)
+      webpack: 5.76.0(webpack-cli@4.10.0)
     dev: true
 
   /terser@5.31.0:
@@ -8237,7 +8240,7 @@ packages:
       tapable: 2.2.1
       terser-webpack-plugin: 5.3.10(webpack@5.76.0)
       watchpack: 2.4.1
-      webpack-cli: 4.10.0(webpack-dev-server@4.11.1)(webpack@5.76.0)
+      webpack-cli: 4.10.0(webpack@5.76.0)
       webpack-sources: 3.2.3
     transitivePeerDependencies:
       - '@swc/core'

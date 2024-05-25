@@ -4,7 +4,8 @@
       
           "./src/title.js": module => {
             let age = require("./src/age.js");
-module.exports = 'title' + age;
+
+module.exports = 'title' + age; //logger1//logger2
           }
         
     };
@@ -23,7 +24,8 @@ module.exports = 'title' + age;
     var exports = {};
     (() => {
       let title = require("./src/title.js");
-console.log('entry2', title);
+
+console.log('entry2', title); //logger1//logger2
     })();
   })();
   

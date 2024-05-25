@@ -3,12 +3,13 @@
     var modules = {
       
           "./src/age.js": module => {
-            module.exports = 'age';
+            module.exports = 'age'; //logger1//logger2
           }
         ,
           "./src/title.js": module => {
             let age = require("./src/age.js");
-module.exports = 'title' + age;
+
+module.exports = 'title' + age; //logger1//logger2
           }
         
     };
@@ -27,7 +28,8 @@ module.exports = 'title' + age;
     var exports = {};
     (() => {
       let title = require("./src/title.js");
-console.log('entry1', title);
+
+console.log('entry1', title); //logger1//logger2
     })();
   })();
   
