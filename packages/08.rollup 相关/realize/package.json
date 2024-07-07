@@ -1,15 +1,17 @@
 {
-  "name": "usage",
+  "name": "realize",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "rollup --config"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "rollup": "^2.75.4"
+    "acorn": "^8.12.0",
+    "magic-string": "^0.30.10",
+    "rollup": "^4.18.0"
   }
 }
