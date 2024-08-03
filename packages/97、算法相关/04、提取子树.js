@@ -47,7 +47,7 @@ const matchFunc = (title, search) => title.match(new RegExp(`^${search}$`, 'i'))
 
 // 一种最简单有效的实现
 function findSubTree(treeData, searchValue) {
-    let result = null
+    let subTree = null
     for (const node of treeData) {
         if (node.title === searchValue) {
             // 基准情况：找到就直接退出，不继续递归了
@@ -55,15 +55,18 @@ function findSubTree(treeData, searchValue) {
         }
 
         if (node.children) {
-            result = findSubTree(node.children, searchValue)
+            const result = findSubTree(node.children, searchValue)
+            if (result) {
+                subTree = node
+            }
         }
     }
-    return result
+    return subTree
 }
 
-const searchValue = '0-0-0';
-const subTree = findSubTree(treeData, searchValue);
-console.log('subTree', getAllNodeKeys([subTree]));
+const searchValue = '0-0-1'
+const subTree = findSubTree(treeData, searchValue)
+console.log('subTree', getAllNodeKeys([subTree]))
 
 /**
  * @description 子树提取的方法，根节点到最后一个符合条件的节点之间的子树
