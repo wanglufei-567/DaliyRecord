@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <title>离线访问示例</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <h1>Service Worker 离线访问策略示例</h1>
+
+        <div class="container">
+            <div class="card">
+                <h2>缓存优先策略</h2>
+                <p>用于静态资源 (CSS, 图片等)</p>
+                <img src="logo.png" alt="Logo" width="100" />
+            </div>
+
+            <div class="card">
+                <h2>网络优先策略</h2>
+                <p>用于 JSON 数据</p>
+                <button id="fetchDataBtn">获取数据</button>
+                <pre id="dataResult">点击按钮获取数据...</pre>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="clearCacheBtn">清除缓存</button>
+            <label>
+                <input type="checkbox" id="offlineMode" />
+                模拟离线模式
+            </label>
+        </div>
+    </body>
+    <script>
+        /**
+         * 注册 Service Worker
+         * 检查浏览器是否支持 Service Worker，并进行注册
+         */
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+                .register('sw.js')
+                .then(reg => {
+                    console.log('✅ Service Worker 注册成功:', reg)
+                })
+                .catch(err => {
+                    console.error('❌ 注册失败:', err)
+                })
+        }
+
+        // 获取页面中的 DOM 元素
+        const fetchDataBtn = document.getElementById('fetchDataBtn')
+        const dataResult = document.getElementById('dataResult')
+        const clearCacheBtn = document.getElementById('clearCacheBtn')
+        const offlineMode = document.getElementById('offlineMode')
+
+        /**
+         * 获取 JSON 数据的事件处理
+         * 根据是否模拟离线模式决定获取方式
+         */
+        fetchDataBtn.addEventListener('click', async () => {
+            dataResult.textContent = '加载中...'
+
+            try {
+                // 如果启用了离线模式，则抛出错误模拟网络失败
+                if (offlineMode.checked) {
+                    throw new Error('模拟网络失败')
+                }
+
+                // 正常从网络获取数据
+                const response = await fetch('data.json')
+                const data = await response.json()
+                dataResult.textContent = JSON.stringify(data, null, 2)
+            } catch (error) {
+                // 网络请求失败的处理
+                dataResult.textContent =
+                    '获取数据失败，可能是离线状态。\n如果有缓存，Service Worker 会尝试使用缓存数据。'
+
+                // 即使在"离线"模式下，Service Worker 仍会拦截请求并可能从缓存提供数据
+                try {
+                    const response = await fetch('data.json')
+                    const data = await response.json()
+                    dataResult.textContent = JSON.stringify(data, null, 2) + '\n\n(来自缓存)'
+                } catch (e) {
+                    dataResult.textContent += '\n\n缓存中也没有数据。'
+                }
+            }
+        })
+
+        /**
+         * 清除缓存的事件处理
+         * 用于测试缓存被清除后的行为
+         */
+        clearCacheBtn.addEventListener('click', async () => {
+            if ('caches' in window) {
+                try {
+                    // 删除指定名称的缓存
+                    await caches.delete('offline-cache-v1')
+                    alert('缓存已清除')
+                } catch (error) {
+                    alert('清除缓存失败: ' + error.message)
+                }
+            } else {
+                alert('您的浏览器不支持 Cache API')
+            }
+        })
+
+        /**
+         * 模拟离线模式切换的事件处理
+         * 当切换离线模式时更新提示信息
+         */
+        offlineMode.addEventListener('change', function () {
+            if (this.checked) {
+                dataResult.textContent = '已启用模拟离线模式，请尝试获取数据'
+            } else {
+                dataResult.textContent = '已禁用模拟离线模式，请尝试获取数据'
+            }
+        })
+    </script>
+</html>

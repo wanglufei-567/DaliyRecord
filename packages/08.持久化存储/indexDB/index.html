@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>IndexedDB 示例</title>
+</head>
+<body>
+  <h1>IndexedDB 用户管理示例</h1>
+
+  <!-- 表单区域：输入用户 ID 和姓名 -->
+  <div>
+    <label>用户ID：<input type="number" id="userId" /></label><br />
+    <label>用户名：<input type="text" id="userName" /></label><br />
+    <button onclick="addUser()">添加用户</button>
+  </div>
+
+  <hr />
+
+  <!-- 查询区域：根据 ID 查询用户 -->
+  <div>
+    <label>查询用户ID：<input type="number" id="queryId" /></label>
+    <button onclick="getUser()">查询用户</button>
+    <p id="queryResult"></p>
+  </div>
+
+  <script>
+    // 声明数据库变量
+    let db;
+
+    // 打开或创建一个名为 'MyDatabase' 的数据库，版本号为 1
+    const request = indexedDB.open('MyDatabase', 1);
+
+    /**
+     * 创建数据库结构
+     * onupgradeneeded 事件：仅在首次创建或升级时触发，用于初始化/升级数据库结构
+     * event 参数包含以下主要信息：
+     * - event.target.result：即打开的数据库实例（IDBDatabase 对象）
+     * - event.oldVersion：数据库旧的版本号（首次创建时为 0）
+     * - event.newVersion：数据库新的版本号
+     * - event.target：触发事件的请求对象（IDBOpenDBRequest）
+     */
+    request.onupgradeneeded = function(event) {
+      /**
+       * 这里拿到的 db 实例仅适用于结构操作（如建表、建索引），
+       * 此时数据库还在升级阶段，不能安全进行数据的增删查改操作，
+       * 数据操作应等到 onsuccess 回调触发后再进行
+       */
+       db = event.target.result;
+
+      const store = db.createObjectStore('users', { keyPath: 'id' });
+
+      /**
+       * 为 'name' 字段创建索引
+       * createIndex(索引名称, 字段名, 配置对象)
+       * - 第1个参数：索引的名称（如 'name'）
+       * - 第2个参数：要索引的对象存储字段（如 'name'）
+       * - 第3个参数：配置对象（如 { unique: false }，表示该索引的值可重复）
+       */
+      store.createIndex('name', 'name', { unique: false });
+
+      console.log('对象存储 "users" 已创建');
+    };
+
+    /**
+     * 数据库打开成功回调
+     * onsuccess 事件：每次数据库成功打开时触发，表示可以安全进行数据操作
+     * event 参数包含以下主要信息：
+     * - event.target.result：即打开的数据库实例（IDBDatabase 对象）
+     * - event.target：触发事件的请求对象（IDBOpenDBRequest）
+     * 为什么需要 onsuccess？
+     * - indexedDB.open() 是异步操作，数据库不是立即可用，只有等 onsuccess 触发后才能安全使用数据库实例
+     * - onupgradeneeded 只负责结构升级（如建表、加索引），不能保证数据库已准备好进行数据读写
+     * - onsuccess 触发时，说明数据库已连接并可用，后续所有数据操作都应在这里拿到 db 实例后进行
+     */
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      console.log('数据库连接成功');
+    };
+
+    // 数据库打开失败
+    request.onerror = function(event) {
+      console.error('数据库连接失败：', event.target.error);
+    };
+
+    // 添加用户到数据库
+    function addUser() {
+      const id = parseInt(document.getElementById('userId').value);
+      const name = document.getElementById('userName').value;
+
+      // 校验用户输入
+      if (!id || !name) {
+        alert('请填写用户 ID 和用户名');
+        return;
+      }
+
+
+      /**
+       * 创建一个只作用于 'users' 的读写事务
+       * transaction(对象存储名称, 事务模式)
+       * - 第1个参数：要操作的对象存储（表）名称，这里是 'users'
+       * - 第2个参数：事务模式，'readwrite' 表示可读写（可增删改），'readonly' 表示只读
+       */
+      const tx = db.transaction('users', 'readwrite');
+
+      // 通过事务获取对象存储（表）实例
+      const store = tx.objectStore('users');
+
+
+      /**
+       * 向对象存储中添加数据
+       * add(要添加的对象)
+       * 注意：如果 id 已经存在，会抛出错误
+       */
+      const request = store.add({ id, name });
+
+      // 当数据成功写入数据库时触发
+      request.onsuccess = () => {
+        alert(`用户 ${name} 添加成功`);
+      };
+
+      // 当添加数据失败（如主键 id 重复）时触发
+      request.onerror = () => {
+        alert('添加失败：该 ID 可能已存在');
+      };
+    }
+
+    // 根据 ID 查询用户
+    function getUser() {
+      const id = parseInt(document.getElementById('queryId').value);
+
+      // 创建一个只读事务
+      const tx = db.transaction('users', 'readonly');
+      const store = tx.objectStore('users');
+
+      // 发起查询请求
+      const request = store.get(id);
+
+      // 查询成功回调
+      request.onsuccess = () => {
+        const result = request.result;
+        const output = document.getElementById('queryResult');
+        if (result) {
+          // 显示查询结果
+          output.textContent = `查询成功：ID=${result.id}, 姓名=${result.name}`;
+        } else {
+          output.textContent = '未找到该用户';
+        }
+      };
+
+      // 查询失败回调
+      request.onerror = () => {
+        alert('查询失败');
+      };
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Cache Storage 示例</title>
+    </head>
+    <body>
+        <h1>Cache Storage 示例</h1>
+        <button id="cache-btn">缓存并读取数据</button>
+
+        <pre id="output"></pre>
+
+        <script>
+            // 定义一个异步函数，用于演示 Cache Storage 的用法
+            async function cacheExample() {
+                const cacheName = 'my-cache' // 缓存名称
+                const requestUrl = './example.json' // 需要缓存的资源路径，需与本 HTML 文件同目录
+
+                const output = document.getElementById('output') // 获取输出区域
+
+                try {
+                    // caches 是浏览器提供的全局 CacheStorage 对象，用于管理缓存
+                    // open 方法用于打开一个指定名称的缓存（如果不存在则新建），返回一个 Promise，解析为 Cache 实例
+                    // open 方法的参数为缓存名称（字符串），如 'my-cache'
+                    const cache = await caches.open(cacheName)
+
+                    // 先获取资源内容
+                    const response = await fetch(requestUrl)
+
+                    // cache.put 用于将请求和响应对象存入缓存
+                    // put 方法的第一个参数为请求（Request 对象或 URL 字符串），第二个参数为响应（Response 对象）
+                    // 由于 response 只能被读取一次，这里用 response.clone() 进行克隆，避免后续读取出错
+                    // 该方法返回一个 Promise，表示缓存操作完成
+                    await cache.put(requestUrl, response.clone())
+
+                    output.textContent += '✅ 已将 example.json 加入缓存\n'
+
+                    setTimeout(async () => {
+                        // cache.match 用于查找缓存中与指定请求匹配的响应
+                        // 参数可以是 Request 对象或 URL 字符串，这里用的是 URL 字符串
+                        // 返回值是一个 Promise，解析为匹配到的 Response 对象（如果没有则为 undefined）
+                        const cachedResponse = await cache.match(requestUrl)
+                        if (cachedResponse) {
+                            // 解析缓存中的 JSON 数据
+                            const data = await cachedResponse.json()
+                            output.textContent +=
+                                '📦 缓存内容：\n' + JSON.stringify(data, null, 2) + '\n'
+                        } else {
+                            output.textContent += '❌ 未找到缓存内容\n'
+                        }
+
+                        // 清除整个缓存（可选操作）
+                        const deleted = await caches.delete(cacheName)
+                        output.textContent += deleted ? '🗑️ 缓存已清除\n' : '⚠️ 缓存清除失败\n'
+                    }, 5000)
+
+                } catch (err) {
+                    // 捕获并输出错误信息
+                    output.textContent += '❌ 错误: ' + err + '\n'
+                }
+            }
+
+            // 给按钮绑定点击事件，触发缓存示例函数
+            document.getElementById('cache-btn').addEventListener('click', cacheExample)
+        </script>
+    </body>
+</html>
