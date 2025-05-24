@@ -2,7 +2,7 @@ module.exports = {
     printWidth: 100,
     // 打印宽度，默认是 80 列
 
-    tabWidth: 4,
+    tabWidth: 2,
     // 缩进所占列数，默认是 2 列
 
     useTabs: false,

@@ -93,7 +93,7 @@ function scheduleCallback(priorityLevel, callback) {
   //向任务最小堆里添加任务，排序的依据是过期时间
   push(taskQueue, newTask);
 
-  //flushWork执行工作，刷新工作，执行任务，
+  // flushWork执行工作，刷新工作，执行任务，
   // 将任务提交到浏览器的任务队列中，并在下一个浏览器帧中执行
   requestHostCallback(workLoop);
   return newTask;

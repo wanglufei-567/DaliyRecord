@@ -63,32 +63,50 @@ function insertOrAppendPlacementNode(node, before, parent) {
 }
 
 /**
- * @description 找到要插入的锚点
- * @description 找到可以插在它的前面的那个fiber对应的真实DOM
- * @param {*} fiber
+ * @description 找到合适的宿主节点（真实 DOM 节点）作为锚点, 后续通过 insertBefore 在锚点前面插入真实 DOM 节点
+ * @param {*} fiber 当前正在处理的 fiber 节点
  */
 function getHostSibling(fiber) {
   let node = fiber;
   siblings: while (true) {
-    // 向上寻找sibling直到没有父fiber或者父fiber是原生节点fiber或者根fiber
+
+    /**
+     * 若是当前 fiber 没有兄弟 fiber，则向上寻找sibling直到没有父fiber或者父fiber是原生节点fiber或者根fiber
+     * 为何要一直向上寻找？
+     * 因为当前 fiber 的父 fiber 可能是一个函数组件或类组件，它们本身没有真实 DOM 节点，不能作为锚点，所以需要一直向上寻找，直到找到一个有真实 DOM 节点的祖先 fiber
+     */
     while (node.sibling === null) {
       if (node.return === null || isHostParent(node.return)) {
         return null;
       }
       node = node.return;
     }
+
+    /**
+     * 若是当前 fiber 有兄弟 fiber，或者上面找到的祖先 fiber 有兄弟 fiber，则进入下面的循环，检查兄弟 fiber 是否可以作为锚点
+     */
     node = node.sibling;
 
-    //如果弟弟不是原生节点也不是文本节点
+
+    /**
+     * 如果兄弟 fiber 是类组件或函数组件，则不能直接作为锚点使用
+     * 需要先检查兄弟 fiber 是否需要移动（有 Placement 标志）
+     * 如果需要移动，则跳出当前 siblings 循环，继续检查当前兄弟 fiber 的兄弟 fiber
+     * 如果不需要移动，则继续检查当前兄弟 fiber 的子 fiber，直到找到一个真实 DOM 节点 （不考虑子fiber 中没有真实 DOM 节点的情况）
+     */
     while (node.tag !== HostComponent && node.tag !== HostText) {
       //如果此节点是一个将要插入的新的节点，找它的弟弟
       if (node.flags & Placement) {
         continue siblings;
       } else {
+        // 向下找子 fiber
         node = node.child;
       }
     }
 
+    /**
+     * 如果兄弟 fiber 是原生节点，则返回兄弟 fiber 的真实 DOM 节点
+     */
     if (!(node.flags & Placement)) {
       return node.stateNode;
     }
@@ -120,19 +138,32 @@ function getHostParentFiber(fiber) {
  * @param {*} finishedWork
  */
 function commitPlacement(finishedWork) {
+  // 获取当前 fiber 的原生节点父 fiber
   const parentFiber = getHostParentFiber(finishedWork);
   switch (parentFiber.tag) {
     case HostRoot: {
+      // 获取原生节点父 fiber 的真实 DOM 节点，hostRootFiber 的 stateNode 是 div#root
       const parent = parentFiber.stateNode.containerInfo;
-      //获取最近的弟弟真实DOM节点
+      // 获取离当前 fiber 最近的真实DOM节点（弟弟节点）作为锚点，可能为 null
       const before = getHostSibling(finishedWork);
+      /**
+       * 将当前 fiber 的 DOM 插入到原生节点父 fiber 的 DOM 中
+       * 当前 fiber 是原生节点，则直接插入
+       * 当前 fiber 是类组件或函数组件，则递归插入子 fiber 中的原生节点
+       */
       insertOrAppendPlacementNode(finishedWork, before, parent);
       break;
     }
     case HostComponent: {
+      // 获取原生节点父 fiber 的真实 DOM 节点
       const parent = parentFiber.stateNode;
-      //获取最近的弟弟真实DOM节点
+      // 获取离当前 fiber 最近的真实DOM节点（弟弟节点）作为锚点，可能为 null
       const before = getHostSibling(finishedWork);
+      /**
+       * 将当前 fiber 的 DOM 插入到原生节点父 fiber 的 DOM 中
+       * 当前 fiber 是原生节点，则直接插入
+       * 当前 fiber 是类组件或函数组件，则递归插入子 fiber 中的原生节点
+       */
       insertOrAppendPlacementNode(finishedWork, before, parent);
       break;
     }
@@ -254,9 +285,9 @@ function commitReconciliationEffects(finishedWork) {
   const { flags } = finishedWork;
   //如果此fiber要执行插入操作的话
   if (flags & Placement) {
-    //进行插入操作，也就是把此fiber对应的真实DOM节点添加到父真实DOM节点上
+    //进行插入操作，也就是把此 fiber 对应的真实DOM节点添加到父真实DOM节点上
     commitPlacement(finishedWork);
-    //把flags里的Placement删除
+    //把flags里的 Placement（插入） tag 删除
     finishedWork.flags & ~Placement;
   }
 }
